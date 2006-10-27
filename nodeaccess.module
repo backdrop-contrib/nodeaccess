@@ -21,7 +21,7 @@ function nodeaccess_help($section) {
 function nodeaccess_menu($may_cache) {
   $items = array();
   if ($may_cache) {
-    $items[] = array('path' => 'admin/settings/nodeaccess', 'title' => t('settings'),
+    $items[] = array('path' => 'admin/settings/nodeaccess', 'title' => t('nodeaccess'),
       'callback' => 'nodeaccess_admin', 'access' => user_access('administer nodeaccess'));
   }
   else {
