@@ -218,7 +218,7 @@ function _nodeaccess_populate($nid) {
   }
   // perform search
   if ($edit['keys'] && $edit['old_keys'] != $edit['keys']) {
-    $sql = "SELECT uid, name FROM {users} WHERE name LIKE \"%%%s%%\"";
+    $sql = "SELECT uid, name FROM {users} WHERE name LIKE '%%%s%%'";
     $params = array(preg_replace('!\*+!', '%', $edit['keys']));
     if (is_array($edit['uid'])) {
       $sql .= ' AND uid NOT IN (%s)';
