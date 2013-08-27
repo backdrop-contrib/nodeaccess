@@ -644,7 +644,6 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
     $form['rid'] = array('#tree' => TRUE);
     foreach ($roles as $key => $field) {
       if (isset($allowed_roles[$key]) && $allowed_roles[$key]) {
-        if ($allowed_roles[$key]) {
           $form['rid'][$key]['name'] = array(
             '#type' => 'hidden',
             '#value' => $field['name'],
@@ -685,25 +684,24 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
               '#value' => $field['grant_delete'],
             );
           }
-        }
-        elseif ($preserve) {
-          $form['rid'][$key]['name'] = array(
-            '#type' => 'hidden',
-            '#value' => $field['name'],
-          );
-          $form['rid'][$key]['grant_view'] = array(
-            '#type' => 'hidden',
-            '#value' => $field['grant_view'],
-          );
-          $form['rid'][$key]['grant_update'] = array(
-            '#type' => 'hidden',
-            '#value' => $field['grant_update'],
-          );
-          $form['rid'][$key]['grant_delete'] = array(
-            '#type' => 'hidden',
-            '#value' => $field['grant_delete'],
-          );
-        }
+      }
+      elseif ($preserve) {
+        $form['rid'][$key]['name'] = array(
+          '#type' => 'hidden',
+          '#value' => $field['name'],
+        );
+        $form['rid'][$key]['grant_view'] = array(
+          '#type' => 'hidden',
+          '#value' => $field['grant_view'],
+        );
+        $form['rid'][$key]['grant_update'] = array(
+          '#type' => 'hidden',
+          '#value' => $field['grant_update'],
+        );
+        $form['rid'][$key]['grant_delete'] = array(
+          '#type' => 'hidden',
+          '#value' => $field['grant_delete'],
+        );
       }
     }
   }
