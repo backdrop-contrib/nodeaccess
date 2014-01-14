@@ -879,9 +879,6 @@ function theme_nodeaccess_grants_form($variables) {
   $allowed_grants = variable_get('nodeaccess-grants', array());
   // Retrieve role names for columns.
   $role_names = user_roles();
-  if (is_numeric($rid)) {
-    $role_names = array($rid => $role_names[$rid]);
-  }
   // Roles table.
   $roles = element_children($form['rid']);
 
