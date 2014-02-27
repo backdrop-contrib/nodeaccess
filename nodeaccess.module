@@ -402,10 +402,10 @@ function nodeaccess_admin_form_submit($form, $form_state) {
       // Otherwise, we only save alias if one was specified.
       if ($val['alias']) {
         $alias_prefs[$id]['name'] = $val['alias'];
+        $alias_prefs[$id]['weight'] = $val['weight'];
       }
     }
   }
-  variable_set('nodeaccess-roles', $allowed_roles);
   nodeaccess_save_role_aliases($alias_prefs);
   // Save author and role permissions for each node type.
   $author_prefs = array();
