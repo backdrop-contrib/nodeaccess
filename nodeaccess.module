@@ -1023,6 +1023,7 @@ function nodeaccess_node_delete($node) {
     node_access_write_grants($node, array(), $realm);
   }
 }
+
 /**
  * Implements hook_node_access_records().
  */
@@ -1036,8 +1037,30 @@ function nodeaccess_node_access_records($node) {
   $priority = variable_get('nodeaccess-priority', 0);
   $result = db_query("SELECT count(*) FROM {nodeaccess} WHERE nid = :nid", array(':nid' => $node->nid))->fetchField();
   if ($result < 1) {
-    // Node has no own grants, use defaults.
-    $grants = $default;
+    // Node has no own grants, use defaults if published.
+    if ($node->status) {
+      $grants = $default;
+    }
+    else {
+      // Otherwise, check access to unpublished content for authenticated and
+      // anonymous users.
+      $role_perms = user_role_permissions(array(1 => 1, 2 => 2));
+      // Anonymous user setting.
+      $grants = array();
+      $grants[] = array(
+        'gid' => 1,
+        'realm' => 'nodeaccess_rid',
+        'grant_view' => isset($role_perms[1]['bypass node access'])?
+                          intval($role_perms[1]['bypass node access']) : 0,
+      );
+      // Authenticated user setting.
+      $grants[] = array(
+        'gid' => 2,
+        'realm' => 'nodeaccess_rid',
+        'grant_view' => isset($role_perms[2]['bypass node access'])?
+                          intval($role_perms[2]['bypass node access']) : 0,
+      );
+    }
     foreach ($grants as $id => $grant) {
       $grants[$id]['priority'] = $priority;
     }
@@ -1071,8 +1094,12 @@ function nodeaccess_node_access_records($node) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Mark module to be in process of disabling.
+ *
+ * Prevents entries being saved to node_access while module is being disabled.
+ *
+ * @param mixed $set
+ *   A boolean set or NULL to not change status.
  */
 function nodeaccess_disabling($set = NULL) {
   static $disabling = FALSE;
@@ -1150,8 +1177,9 @@ function nodeaccess_node_type_insert($info) {
 }
 
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Retrieve role aliases.
+ *
+ * @return array or role aliases indexed by rid.
  */
 function nodeaccess_get_role_aliases() {
   $aliases = array();
@@ -1164,9 +1192,12 @@ function nodeaccess_get_role_aliases() {
   return $aliases;
 }
 
+
 /**
- * @todo Please document this function.
- * @see http://drupal.org/node/1354
+ * Save a role alias.
+ *
+ * @param array $edit
+ *   An array of aliases to save, indexed by rid.
  */
 function nodeaccess_save_role_aliases($edit) {
   db_delete('nodeaccess_role_alias')->execute();
