@@ -1034,8 +1034,17 @@ function nodeaccess_node_access_records($node) {
   }
   // Need to find out if node has own grants or whether to use defaults.
   $default = variable_get('nodeaccess_' . $node->type, array());
-  // Load priority setting.
-  $priority = variable_get('nodeaccess-priority', 0);
+
+  // Setup default keys that are required by node_access_write_grants().
+  $grant_defaults = array(
+    'gid' => 0,
+    'realm' => 'nodeaccess_rid',
+    'grant_view' => 0,
+    'grant_update' => 0,
+    'grant_delete' => 0,
+    'priority' => variable_get('nodeaccess-priority', 0),
+  );
+
   $result = db_query("SELECT count(*) FROM {nodeaccess} WHERE nid = :nid", array(':nid' => $node->nid))->fetchField();
   if ($result < 1) {
     // Node has no own grants, use defaults if published.
@@ -1045,25 +1054,23 @@ function nodeaccess_node_access_records($node) {
     else {
       // Otherwise, check access to unpublished content for authenticated and
       // anonymous users.
-      $role_perms = user_role_permissions(array(1 => 1, 2 => 2));
+      $role_perms = user_role_permissions(array(
+        DRUPAL_ANONYMOUS_RID => DRUPAL_ANONYMOUS_RID,
+        DRUPAL_AUTHENTICATED_RID => DRUPAL_AUTHENTICATED_RID,
+      ));
       // Anonymous user setting.
       $grants = array();
       $grants[] = array(
-        'gid' => 1,
-        'realm' => 'nodeaccess_rid',
-        'grant_view' => isset($role_perms[1]['bypass node access'])?
-                          intval($role_perms[1]['bypass node access']) : 0,
+        'gid' => DRUPAL_ANONYMOUS_RID,
+        'grant_view' => isset($role_perms[DRUPAL_ANONYMOUS_RID]['bypass node access']) ?
+          intval($role_perms[DRUPAL_ANONYMOUS_RID]['bypass node access']) : 0,
       );
       // Authenticated user setting.
       $grants[] = array(
-        'gid' => 2,
-        'realm' => 'nodeaccess_rid',
-        'grant_view' => isset($role_perms[2]['bypass node access'])?
-                          intval($role_perms[2]['bypass node access']) : 0,
+        'gid' => DRUPAL_AUTHENTICATED_RID,
+        'grant_view' => isset($role_perms[DRUPAL_AUTHENTICATED_RID]['bypass node access']) ?
+          intval($role_perms[DRUPAL_AUTHENTICATED_RID]['bypass node access']) : 0,
       );
-    }
-    foreach ($grants as $id => $grant) {
-      $grants[$id]['priority'] = $priority;
     }
   }
   else {
@@ -1077,7 +1084,6 @@ function nodeaccess_node_access_records($node) {
         'grant_view' => $row->grant_view,
         'grant_update' => $row->grant_update,
         'grant_delete' => $row->grant_delete,
-        'priority' => $priority,
       );
     }
   }
@@ -1087,10 +1093,14 @@ function nodeaccess_node_access_records($node) {
   $grant = $author_prefs[$node->type];
   $grant['gid'] = $node->uid;
   $grant['realm'] = 'nodeaccess_author';
-  $grant['priority'] = $priority;
   // Include author grant even with all values FALSE, it may be
   // needed to overwrite an older value.
   $grants[] = $grant;
+
+  foreach ($grants as $id => $grant) {
+    // Merge missing default grant keys.
+    $grants[$id] = $grants[$id] + $grant_defaults;
+  }
   return $grants;
 }
 
