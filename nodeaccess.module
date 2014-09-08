@@ -602,21 +602,19 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
       foreach (array_keys($form_values['uid']) as $uid) {
         if (!$form_values['uid'][$uid]['keep']) {
           foreach (array('grant_view', 'grant_update', 'grant_delete') as $grant_type) {
-            $form_values['uid'][$uid][$grant_type] = db_query_range("SELECT count(*) FROM {node_access} na LEFT JOIN {users_roles} r ON na.gid = r.rid WHERE nid = :nid AND realm = :realm AND uid = :uid AND :type = 1",
+            $form_values['uid'][$uid][$grant_type] = db_query_range("SELECT count(*) FROM {node_access} na LEFT JOIN {users_roles} r ON na.gid = r.rid WHERE nid = :nid AND realm = :realm AND uid = :uid AND $grant_type = 1",
               0, 1,
               array(
                 ':nid' => $node->nid,
                 ':realm' => 'nodeaccess_rid',
                 ':uid' => $uid,
-                ':type' => $grant_type,
               ))->fetchField() ||
-              db_query_range("SELECT count(*) FROM {node_access} na WHERE nid = :nid AND realm = :realm AND gid = :gid AND :type = 1",
+              db_query_range("SELECT count(*) FROM {node_access} na WHERE nid = :nid AND realm = :realm AND gid = :gid AND $grant_type = 1",
                 0, 1,
                 array(
                   ':nid' => $node->nid,
                   ':realm' => 'nodeaccess_uid',
                   ':gid' => $uid,
-                  ':type' => $grant_type,
                 )
                 )->fetchField();
           }
