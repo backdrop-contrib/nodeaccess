@@ -1079,27 +1079,6 @@ function nodeaccess_node_access_records($node) {
     if ($node->status) {
       $grants = $default;
     }
-    else {
-      // Otherwise, check access to unpublished content for authenticated and
-      // anonymous users.
-      $role_perms = user_role_permissions(array(
-        DRUPAL_ANONYMOUS_RID => DRUPAL_ANONYMOUS_RID,
-        DRUPAL_AUTHENTICATED_RID => DRUPAL_AUTHENTICATED_RID,
-      ));
-      // Anonymous user setting.
-      $grants = array();
-      $grants[] = array(
-        'gid' => DRUPAL_ANONYMOUS_RID,
-        'grant_view' => isset($role_perms[DRUPAL_ANONYMOUS_RID]['bypass node access']) ?
-          intval($role_perms[DRUPAL_ANONYMOUS_RID]['bypass node access']) : 0,
-      );
-      // Authenticated user setting.
-      $grants[] = array(
-        'gid' => DRUPAL_AUTHENTICATED_RID,
-        'grant_view' => isset($role_perms[DRUPAL_AUTHENTICATED_RID]['bypass node access']) ?
-          intval($role_perms[DRUPAL_AUTHENTICATED_RID]['bypass node access']) : 0,
-      );
-    }
   }
   else {
     // Node has own grants, use them.
