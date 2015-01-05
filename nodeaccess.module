@@ -117,7 +117,7 @@ function nodeaccess_node_access($node, $op, $account) {
       // If the node belongs to a deleted user.
       if ($account->uid == 0 && $node->uid == 0) {
         // We check if the role has particular access to this node.
-        $grants = _nodeaccess_get_grants($node);
+        $grants = nodeaccess_get_grants($node);
         // If anonymous has rights to this node, we allow them.
         if (($grants['rid'][DRUPAL_ANONYMOUS_RID]['grant_update'] && $op == 'update') ||
             ($grants['rid'][DRUPAL_ANONYMOUS_RID]['grant_delete'] && $op == 'delete')) {
@@ -254,7 +254,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
 
   if (!$form_values) {
     $form_values = array();
-    $grants = _nodeaccess_get_grants($node);
+    $grants = nodeaccess_get_grants($node);
     $form_values['rid'] = isset($grants['rid']) ? $grants['rid'] : array();
     $form_values['uid'] = isset($grants['uid']) ? $grants['uid'] : array();
   }
@@ -926,7 +926,7 @@ function nodeaccess_save_role_aliases($edit) {
  * @param Object $node
  */
 function nodeaccess_insert_user_reference($node) {
-  $form_values = _nodeaccess_get_grants($node);
+  $form_values = nodeaccess_get_grants($node);
   // Now, append or overwrite the uid with what was specified in the user
   // reference field.
   $fields = variable_get('nodeaccess_' . $node->type . '_user_reference', array());
@@ -959,7 +959,7 @@ function nodeaccess_insert_user_reference($node) {
  * @param Object $node
  */
 function nodeaccess_delete_user_reference($node) {
-  $form_values = _nodeaccess_get_grants($node);
+  $form_values = nodeaccess_get_grants($node);
   // Now, append or overwrite the uid with what was specified in the user
   // reference field.
   $fields = variable_get('nodeaccess_' . $node->type . '_user_reference', array());
@@ -985,7 +985,7 @@ function nodeaccess_delete_user_reference($node) {
  * @return array
  *   An array of grants with keys 'rid' for roles and 'uid' for users.
  */
-function _nodeaccess_get_grants($node) {
+function nodeaccess_get_grants($node) {
   $grants = array();
   // Load all roles.
   $result = db_query("SELECT r.rid, nra.name, na.grant_view, na.grant_update, na.grant_delete FROM {role} r LEFT JOIN {nodeaccess_role_alias} nra ON r.rid = nra.rid LEFT JOIN {node_access} na ON r.rid = na.gid AND na.realm = :realm AND na.nid = :nid ORDER BY nra.weight, nra.name",
