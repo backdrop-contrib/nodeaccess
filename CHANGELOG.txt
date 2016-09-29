@@ -1,5 +1,6 @@
 Nodeaccess 7.x-1.x
 ===================
+Issue #2427345 by trigdog: fix Database Error - nodeaccess_author duplicate entry
 
 Nodeaccess 7.x-1.5
 ===================

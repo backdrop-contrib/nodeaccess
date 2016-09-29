@@ -678,17 +678,6 @@ function nodeaccess_node_grants($account, $op) {
  * @param Object $node
  */
 function nodeaccess_node_update($node) {
-  // Node author may have changed, overwrite old record.
-  $author_prefs = variable_get('nodeaccess_authors', array());
-  // Array is prepopulated with grant values.
-  $grant = $author_prefs[$node->type];
-  $grant['gid'] = $node->uid;
-  $grant['realm'] = 'nodeaccess_author';
-  $grants = array();
-  $grants[] = $grant;
-
-  nodeaccess_save_grant($node, $grant);
-
   if (module_exists('user_reference')) {
     $fields = variable_get('nodeaccess_' . $node->type . '_user_reference', array());
     foreach (array_keys($fields) as $field_name) {
