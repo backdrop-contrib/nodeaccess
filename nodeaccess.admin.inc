@@ -11,7 +11,6 @@ function nodeaccess_admin() {
   return drupal_get_form('nodeaccess_admin_form');
 }
 
-
 /**
  * Menu callback. Draws the admin page.
  *

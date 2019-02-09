@@ -69,7 +69,6 @@ function nodeaccess_admin_paths() {
   return $paths;
 }
 
-
 /**
  * Implements hook_permission().
  *
@@ -107,6 +106,7 @@ function nodeaccess_permission() {
  * @return string
  */
 function nodeaccess_node_access($node, $op, $account) {
+
   switch ($op) {
     case 'update':
     case 'delete':
@@ -116,46 +116,18 @@ function nodeaccess_node_access($node, $op, $account) {
       }
       // If the node belongs to a deleted user.
       if ($account->uid == 0 && $node->uid == 0) {
-        // We check if the role has particular access to this node.
         $grants = nodeaccess_get_grants($node);
+        // We check if the role has particular access to this node.
         // If anonymous has rights to this node, we allow them.
-        if (($grants['rid'][DRUPAL_ANONYMOUS_RID]['grant_update'] && $op == 'update') ||
-            ($grants['rid'][DRUPAL_ANONYMOUS_RID]['grant_delete'] && $op == 'delete')) {
-
+        if ((!empty($grants['rid'][DRUPAL_ANONYMOUS_RID]['grant_update']) && $op == 'update') ||
+            (!empty($grants['rid'][DRUPAL_ANONYMOUS_RID]['grant_delete']) && $op == 'delete')) {
           return NODE_ACCESS_ALLOW;
         }
-
         return NODE_ACCESS_DENY;
       }
       break;
-
-    case 'view':
-      if (!isset($account->uid)) {
-        global $user;
-        $account = $user;
-      }
-      // If the node is not published. We check other permissions.
-      if (!$node->status) {
-        // If the current user is the author and not anonymous.
-        if ($node->uid == $account->uid && $account->uid > 0) {
-          // We check to see if they have access to view own unpublished.
-          if (user_access('view own unpublished content') || user_access('bypass node access')) {
-
-            return NODE_ACCESS_ALLOW;
-          }
-        }
-        elseif (user_access('bypass node access')) {
-
-          return NODE_ACCESS_ALLOW;
-        }
-
-        return NODE_ACCESS_IGNORE;
-      }
-      break;
-
   }
 }
-
 
 /**
  * Determine access to Grant tab.
@@ -187,10 +159,10 @@ function nodeaccess_access($op, $node, $account = NULL) {
   $allowed_types = variable_get('nodeaccess-types', array());
   if ($op == 'grant') {
     if ($node->nid && isset($allowed_types[$node->type]) && !empty($allowed_types[$node->type]) &&
-        (user_access('grant node permissions', $account) ||
-         (user_access('grant editable node permissions', $account) && node_access('update', $node, $account)) ||
-         (user_access('grant deletable node permissions', $account) && node_access('delete', $node, $account)) ||
-         (user_access('grant own node permissions', $account) && ($account->uid == $node->uid)))) {
+      (user_access('grant node permissions', $account) ||
+      (user_access('grant editable node permissions', $account) && node_access('update', $node, $account)) ||
+      (user_access('grant deletable node permissions', $account) && node_access('delete', $node, $account)) ||
+      (user_access('grant own node permissions', $account) && ($account->uid == $node->uid)))) {
 
       return TRUE;
     }
@@ -235,10 +207,8 @@ function nodeaccess_theme($existing, $type, $theme, $path) {
  *   Form array.
  */
 function nodeaccess_grant_tab($node) {
-
   return drupal_get_form('nodeaccess_grants_form', $node);
 }
-
 
 /**
  * Menu callback. Draws the grant tab.
@@ -250,7 +220,7 @@ function nodeaccess_grant_tab($node) {
  * @return mixed
  */
 function nodeaccess_grants_form($form, &$form_state, $node) {
-  $form_values = &$form_state['values'];
+  $form_values = $form_state['values'];
 
   if (!$form_values) {
     $form_values = array();
@@ -259,19 +229,19 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
     $form_values['uid'] = isset($grants['uid']) ? $grants['uid'] : array();
   }
   elseif ($form_values['keys']) {
-    // @todo rewrite
-    $params = array();
-    $sql = "SELECT uid, name FROM {users} WHERE name LIKE :name";
     $name = preg_replace('!\*+!', '%', $form_values['keys']);
-    $params[':name'] = $name;
+    $uid = array_keys($form_values['uid']);
+
+    $query = db_select('users', 'u')
+      ->fields('u', array('uid', 'name'))
+      ->condition('name', $name, "LIKE");
 
     if (isset($form_values['uid']) && count($form_values['uid'])) {
-      $sql .= ' AND uid NOT IN (:uid)';
-      $params[':uid'] = array_keys($form_values['uid']);
+      $query->condition('uid', $uid, 'NOT IN');
     }
 
-    $result = db_query($sql, $params);
-    foreach ($result as $account) {
+    $result = $query->execute();
+    while ($account = $result->fetch()) {
       $form_values['uid'][$account->uid] = array(
         'name' => $account->name,
         'keep' => 1,
@@ -476,9 +446,7 @@ function nodeaccess_grants_form_validate($form, &$form_state) {
   if (!isset($form_values['uid'])) {
     unset($form_values['uid']);
   }
-
 }
-
 
 /**
  * Submit function for nodeaccess_grants_form.
@@ -525,18 +493,12 @@ function _nodeaccess_grants_form_submit($form, &$form_state) {
           'grant_update' => empty($line['grant_update']) ? 0 : 1,
           'grant_delete' => empty($line['grant_delete']) ? 0 : 1,
         );
-
         $grants[] = $grant;
-
       }
     }
-
   }
-
   nodeaccess_set_grants($node, $grants);
-
 }
-
 
 /**
  * Theme function for nodeaccess_grants_form.
@@ -695,7 +657,6 @@ function nodeaccess_node_update($node) {
   // Done, author permissions are not written into nodeaccess.
 }
 
-
 /**
  * Implements hook_node_delete().
  *
@@ -705,7 +666,6 @@ function nodeaccess_node_delete($node) {
   // Deleting node, delete related permissions.
   nodeaccess_delete_grants($node);
 }
-
 
 /**
  * Implements hook_node_access_records().
@@ -732,8 +692,10 @@ function nodeaccess_node_access_records($node) {
     'priority' => variable_get('nodeaccess-priority', 0),
   );
 
-  $result = db_query("SELECT gid, realm, grant_view, grant_update, grant_delete FROM {nodeaccess} WHERE nid = :nid",
-    array(':nid' => $node->nid));
+  $query = db_select('nodeaccess', 'n')
+    ->fields('n', array('gid', 'realm', 'grant_view', 'grant_update', 'grant_delete'))
+    ->condition('nid', $node->nid, '=');
+  $result = $query->execute();
   if (!$result->rowCount()) {
     // Node has no own grants, use defaults.
     $grants = $default;
@@ -872,20 +834,23 @@ function nodeaccess_node_type_insert($info) {
  */
 function nodeaccess_get_role_aliases() {
   $aliases = array();
-  $sql = 'SELECT r.rid, r.name, a.name AS alias, a.weight
-    FROM {role} r
-    LEFT JOIN {nodeaccess_role_alias} a ON r.rid = a.rid
-    ORDER BY a.weight, r.weight, a.name, r.name';
-  $results = db_query($sql);
-  foreach ($results as $a) {
+  $query = db_select('role', 'r');
+  $query->join('nodeaccess_role_alias', 'a', 'r.rid = a.rid');
+  $query->fields('r', array('rid', 'name'));
+  $query->addField('a', 'name', 'alias');
+  $query->addField('a', 'weight');
+  $query->orderBy('a.weight');
+  $query->orderBy('r.weight');
+  $query->orderBy('a.name');
+  $query->orderBy('r.name');
+  $result = $query->execute();
+  while($a = $result->fetch()) {
     $aliases[$a->rid]['name'] = $a->name;
     $aliases[$a->rid]['alias'] = $a->alias;
     $aliases[$a->rid]['weight'] = $a->weight;
   }
-
   return $aliases;
 }
-
 
 /**
  * Save a role alias.
@@ -904,10 +869,8 @@ function nodeaccess_save_role_aliases($edit) {
       ))->execute();
     }
   }
-
   return;
 }
-
 
 /**
  * Insert userreference grants from a node.
@@ -941,7 +904,6 @@ function nodeaccess_insert_user_reference($node) {
   }
 }
 
-
 /**
  * Delete all userreference user grants from a node.
  *
@@ -965,7 +927,6 @@ function nodeaccess_delete_user_reference($node) {
   _nodeaccess_grants_form_submit(NULL, $form_state);
 }
 
-
 /**
  * Return the grants applied to a node object used for Grant form.
  *
@@ -976,13 +937,20 @@ function nodeaccess_delete_user_reference($node) {
  */
 function nodeaccess_get_grants($node) {
   $grants = array();
-  // Load all roles.
-  $result = db_query("SELECT r.rid, nra.name, na.grant_view, na.grant_update, na.grant_delete FROM {role} r LEFT JOIN {nodeaccess_role_alias} nra ON r.rid = nra.rid LEFT JOIN {node_access} na ON r.rid = na.gid AND na.realm = :realm AND na.nid = :nid ORDER BY nra.weight, nra.name",
-    array(
-      ':realm' => 'nodeaccess_rid',
-      ':nid' => $node->nid,
-    ));
-  foreach ($result as $grant) {
+
+  // Load grants by roles.
+  $query = db_select('nodeaccess', 'na');
+  $query->join('role', 'r', 'r.rid = na.gid');
+  $query->join('nodeaccess_role_alias', 'nra', 'nra.rid = r.rid');
+  $query->fields('r', array('rid', 'name'));
+  $query->fields('na', array('grant_view', 'grant_update', 'grant_delete'));
+  $query->condition('na.realm', 'nodeaccess_rid', '=');
+  $query->condition('na.nid', $node->nid, '=');
+  $query->orderBy('nra.weight');
+  $query->orderBy('nra.name');
+  $result = $query->execute();
+
+  while ($grant = $result->fetch()) {
     if ($grant->name) {
       $grants['rid'][$grant->rid] = array(
         'name' => $grant->name,
@@ -992,13 +960,17 @@ function nodeaccess_get_grants($node) {
       );
     }
   }
-  // Load users from node_access.
-  $result = db_query("SELECT uid, name, grant_view, grant_update, grant_delete FROM {node_access} LEFT JOIN {users} ON uid = gid WHERE nid = :nid AND realm = :realm ORDER BY name",
-    array(
-      ':nid' => $node->nid,
-      ':realm' => 'nodeaccess_uid',
-    ));
-  foreach ($result as $account) {
+  // Load grants by users
+  $query = db_select('node_access', 'na');
+  $query->join('users', 'u', 'u.uid = na.gid');
+  $query->fields('u', array('uid', 'name'));
+  $query->fields('na', array('grant_view', 'grant_update', 'grant_delete'));
+  $query->condition('na.nid', $node->nid, '=');
+  $query->condition('na.realm', 'nodeaccess_uid', '=');
+  $query->orderBy('name');
+  $result = $query->execute();
+
+  while ($account = $result->fetch()) {
     $grants['uid'][$account->uid] = array(
       'name' => $account->name,
       'keep' => TRUE,
@@ -1007,10 +979,8 @@ function nodeaccess_get_grants($node) {
       'grant_delete' => (bool) $account->grant_delete,
     );
   }
-
   return $grants;
 }
-
 
 /**
  * Set all grants for a node to nodeaccess table and acquire them.
@@ -1058,7 +1028,6 @@ function nodeaccess_delete_grants($node) {
   }
 }
 
-
 /**
  * Revoke all custom grants from nodeaccess table for this node.  Essentially
  * reset the grants to their default state (by node type).
@@ -1070,7 +1039,6 @@ function nodeaccess_revoke_grants($node) {
   nodeaccess_delete_grants($node);
   node_access_acquire_grants($node);
 }
-
 
 /**
  * Save the grant settings/options for the node.
@@ -1106,7 +1074,6 @@ function nodeaccess_save_grant($node, $grant) {
   }
 }
 
-
 /**
  * Add the grant tab to the specified node type.
  *
@@ -1119,7 +1086,6 @@ function nodeaccess_add_type_grant($type) {
 
   nodeaccess_set_type_grants($grants);
 }
-
 
 /**
  * Delete the grant tab for specified node type.
@@ -1137,7 +1103,6 @@ function nodeaccess_delete_type_grant($type) {
   nodeaccess_set_type_grants($grants);
 }
 
-
 /**
  * Set the grant tab settings for all node types.
  *
@@ -1151,6 +1116,5 @@ function nodeaccess_set_type_grants($types = array()) {
   }
 
   variable_set('nodeaccess-types', $types);
-
   node_access_needs_rebuild(TRUE);
 }

@@ -1,3 +1,9 @@
+Nodeaccess 7.x-1.6
+==================
+Corrected issues surrounding security advisory SA-CONTRIB-2019-009
+Addressed compatibility issues with SQL queries regarding PostgreSQL
+Rebuilding of node permissions required after update.
+
 Nodeaccess 7.x-1.x
 ===================
 Issue #2427345 by trigdog: fix Database Error - nodeaccess_author duplicate entry
