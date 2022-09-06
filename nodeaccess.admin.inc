@@ -20,16 +20,20 @@ function nodeaccess_admin() {
  * @return array $form
  */
 function nodeaccess_admin_form($form, $form_state) {
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+
   // Set defaults from variable_get.
   $show = variable_get('nodeaccess-types', array());
-  $roles = nodeaccess_get_role_aliases();
-  $allowed_roles = variable_get('nodeaccess-roles', array());
-  $allowed_grants = variable_get('nodeaccess-grants', array());
+  $roles =  $config->get('role_map');
+
+  $allowed_roles = $config->get('allowed_roles');
+  $allowed_grants = variable_get('allowed_grants');
 
   $form['priority'] = array(
     '#type' => 'checkbox',
     '#title' => t('Give node grants priority'),
-    '#default_value' => variable_get('nodeaccess-priority', 0),
+    '#default_value' => $config->get('priority'),
     '#description' => t('If you are only using this access control module,
       you can safely ignore this. If you are using multiple access control
       modules, and you want the grants given on individual nodes to override
@@ -40,7 +44,7 @@ function nodeaccess_admin_form($form, $form_state) {
   $form['preserve'] = array(
     '#type' => 'checkbox',
     '#title' => t('Preserve hidden grants'),
-    '#default_value' => variable_get('nodeaccess-preserve', 1),
+    '#default_value' => $config->get('preserve'),
     '#description' => '<small>' . t('If you check this box, any hidden grants
       are preserved when you save grants. Otherwise all grants users are not
       allowed to view or edit are revoked on save.') . '</small>',
@@ -75,7 +79,7 @@ function nodeaccess_admin_form($form, $form_state) {
   );
 
   // Select roles the permissions of which you want to allow users to
-  // view and edit, and the aliases and weights of those roles.
+  // view and edit.
   $form['role'] = array(
     '#type' => 'fieldset',
     '#collapsible' => TRUE,
@@ -85,38 +89,26 @@ function nodeaccess_admin_form($form, $form_state) {
     '#theme' => 'nodeaccess_admin_form_roles',
     '#description' => t('The selected roles will be listed on individual node
       grants. If you wish for certain roles to be hidden from users on the node
-      grants tab, make sure they are not selected here. You may also provide an
-      alias for each role to be displayed to the user and a weight to order them
-      by. This is useful if your roles have machine-readable names not intended
-      for human users.'),
+      grants tab, make sure they are not selected here.'),
   );
 
   foreach ($roles as $id => $role) {
     // Catch NULL values.
-    if (!$role['alias']) {
-      $role['alias'] = '';
-    }
-    if (!$role['weight']) {
+    if (!$role->weight) {
       $role['weight'] = 0;
     }
     $form['role'][$id]['name'] = array(
       '#type' => 'hidden',
-      '#value' => $role['name'],
+      '#value' => $role->name,
     );
     $form['role'][$id]['allow'] = array(
       '#type' => 'checkbox',
-      '#title' => check_plain($role['name']),
+      '#title' => check_plain($role->label),
       '#default_value' => isset($allowed_roles[$id]) ? $allowed_roles[$id] : 0,
-    );
-    $form['role'][$id]['alias'] = array(
-      '#type' => 'textfield',
-      '#default_value' => $role['alias'],
-      '#size' => 50,
-      '#maxlength' => 50,
     );
     $form['role'][$id]['weight'] = array(
       '#type' => 'weight',
-      '#default_value' => $role['weight'],
+      '#default_value' => $role->weight,
       '#delta' => 10,
     );
   }
@@ -264,32 +256,18 @@ function nodeaccess_admin_form_submit($form, $form_state) {
     $allowed_grants[$id] = $val;
   }
   variable_set('nodeaccess-grants', $allowed_grants);
-  // Save allowed roles, role aliases and weights.
-  $alias_prefs = array();
+
+  // Iterate through the allowed roles and re-save into our 
+  // configuration. No aliases. Just names and weights.
   $allowed_roles = array();
   foreach ($form_values['role'] as $id => $val) {
+    if (empty($id)) {
+      continue;
+    }
     $allowed_roles[$id] = $val['allow'];
-    // Save alias and weight only for allowed roles.
-    if ($val['allow']) {
-      // If alias is empty, default to role name.
-      if ($val['alias']) {
-        $alias_prefs[$id]['name'] = $val['alias'];
-      }
-      else {
-        $alias_prefs[$id]['name'] = $val['name'];
-      }
-      $alias_prefs[$id]['weight'] = $val['weight'];
-    }
-    else {
-      // Otherwise, we only save alias if one was specified.
-      if ($val['alias']) {
-        $alias_prefs[$id]['name'] = $val['alias'];
-        $alias_prefs[$id]['weight'] = $val['weight'];
-      }
-    }
   }
   variable_set('nodeaccess-roles', $allowed_roles);
-  nodeaccess_save_role_aliases($alias_prefs);
+
   // Save author and role permissions for each node type.
   $author_prefs = array();
   foreach (node_type_get_types() as $type => $name) {
@@ -354,22 +332,21 @@ function theme_nodeaccess_admin_form_roles($variables) {
       'class' => array('draggable'),
     );
     // Render the table columns.
-    $row['data'][] = drupal_render($form[$rid]['allow']);
-    $row['data'][] = drupal_render($form[$rid]['alias']);
-    $row['data'][] = drupal_render($form[$rid]['weight']);
+    $row['data'][] = backdrop_render($form[$rid]['allow']);
+    $row['data'][] = backdrop_render($form[$rid]['weight']);
     $rows[] = $row;
   }
 
-  $header = array(t('Allow Role'), t('Alias'), t('Weight'));
+  $header = array(t('Allow Role'), t('Weight'));
   $output .= theme('table', array(
     'header' => $header,
     'rows' => $rows,
     'attributes' => array('id' => 'roles-order'),
   ));
-  $output .= drupal_render_children($form);
+  $output .= backdrop_render_children($form);
 
   // Attach TableDrag to the table ID and contained weight elements.
-  drupal_add_tabledrag('roles-order', 'order', 'sibling', 'roles-order-weight');
+  backdrop_add_tabledrag('roles-order', 'order', 'sibling', 'roles-order-weight');
 
   return $output;
 }

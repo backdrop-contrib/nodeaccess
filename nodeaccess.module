@@ -24,6 +24,16 @@ function nodeaccess_help($path, $arg) {
   }
 }
 
+/**
+ * Implements hook_config_info().
+ */
+function nodeaccess_config_info() {
+  $prefixes['nodeaccess.settings'] = array(
+    'label' => t('Nodeaccess Settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
 
 /**
  * Implements hook_menu().
@@ -273,11 +283,16 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
     '#value' => $node->nid,
   );
 
-  $allowed_roles = variable_get('nodeaccess-roles', array());
-  $allowed_grants = variable_get('nodeaccess-grants', array());
+  // Open our Backdrop configuration for the module and read in
+  // the settings.
+  $config = config('nodeaccess.settings');
+  $allowed_roles =  $config->get('allowed_roles', array());
+  $allowed_grants = $config->get('allowed_grants', array());
+  
   // If $preserve is TRUE, the fields the user is not allowed to view or
   // edit are included in the form as hidden fields to preserve them.
-  $preserve = variable_get('nodeaccess-preserve', 1);
+  $preserve = $config->get('preserve', TRUE);
+
   // Roles table.
   if (is_array($roles)) {
     $form['rid'] = array('#tree' => TRUE);
@@ -465,7 +480,7 @@ function nodeaccess_grants_form_submit($form, &$form_state) {
   else {
     unset($form_state['rebuild']);
     _nodeaccess_grants_form_submit($form, $form_state);
-    drupal_set_message(t('Grants saved.'));
+    backdrop_set_message(t('Grants saved.'));
   }
 }
 
@@ -517,15 +532,7 @@ function theme_nodeaccess_grants_form($vars) {
   $allowed_roles = variable_get('nodeaccess-roles', array());
   $allowed_grants = variable_get('nodeaccess-grants', array());
   // Retrieve role names for columns.
-  $role_names = user_roles();
-  $role_aliases = nodeaccess_get_role_aliases();
-
-  // Replace names with aliases.
-  foreach ($role_names as $rid => $name) {
-    if (isset($role_aliases[$rid]['alias'])) {
-      $role_names[$rid] = $role_aliases[$rid]['alias'];
-    }
-  }
+  $roles = user_roles();
 
   // Roles table.
   $roles = element_children($form['rid']);
@@ -546,22 +553,21 @@ function theme_nodeaccess_grants_form($vars) {
       $header[] = t('Delete');
     }
 
-    foreach ($roles as $key) {
-
+    foreach ($roles as $key => $role) {
       if (isset($allowed_roles[$key]) && $allowed_roles[$key]) {
         $row = array();
-        $row[] = $role_names[$key] . drupal_render($form['rid'][$key]['name']);
+        $row[] = $role_names[$key] . backdrop_render($form['rid'][$key]['name']);
 
         if ($allowed_grants['view']) {
-          $row[] = drupal_render($form['rid'][$key]['grant_view']);
+          $row[] = backdrop_render($form['rid'][$key]['grant_view']);
         }
 
         if ($allowed_grants['edit']) {
-          $row[] = drupal_render($form['rid'][$key]['grant_update']);
+          $row[] = backdrop_render($form['rid'][$key]['grant_update']);
         }
 
         if ($allowed_grants['delete']) {
-          $row[] = drupal_render($form['rid'][$key]['grant_delete']);
+          $row[] = backdrop_render($form['rid'][$key]['grant_delete']);
         }
         $rows[] = $row;
       }
@@ -573,8 +579,8 @@ function theme_nodeaccess_grants_form($vars) {
   $output .= '<p><div class="search-form">';
   $output .= '<strong>' . t('Enter names to search for users:') . '</strong>';
   $output .= '<div class="container-inline">';
-  $output .= drupal_render($form['keys']);
-  $output .= drupal_render($form['search']);
+  $output .= backdrop_render($form['keys']);
+  $output .= backdrop_render($form['search']);
   $output .= '</div></div></p>';
 
   // Users table.
@@ -827,55 +833,8 @@ function nodeaccess_node_type_insert($info) {
   node_access_needs_rebuild(TRUE);
 }
 
-
 /**
- * Retrieve role aliases.
- *
- * @return array
- *  Role aliases indexed by rid.
- */
-function nodeaccess_get_role_aliases() {
-  $aliases = array();
-  $query = db_select('role', 'r');
-  $query->leftJoin('nodeaccess_role_alias', 'a', 'r.rid = a.rid');
-  $query->fields('r', array('rid', 'name'));
-  $query->addField('a', 'name', 'alias');
-  $query->addField('a', 'weight');
-  $query->orderBy('a.weight');
-  $query->orderBy('r.weight');
-  $query->orderBy('a.name');
-  $query->orderBy('r.name');
-  $result = $query->execute();
-  while($a = $result->fetch()) {
-    $aliases[$a->rid]['name'] = $a->name;
-    $aliases[$a->rid]['alias'] = $a->alias;
-    $aliases[$a->rid]['weight'] = $a->weight;
-  }
-  return $aliases;
-}
-
-/**
- * Save a role alias.
- *
- * @param array $edit
- *   An array of aliases to save, indexed by rid.
- */
-function nodeaccess_save_role_aliases($edit) {
-  db_delete('nodeaccess_role_alias')->execute();
-  if (is_array($edit)) {
-    foreach ($edit as $key => $value) {
-      db_insert('nodeaccess_role_alias')->fields(array(
-        'rid' => $key,
-        'name' => $value['name'],
-        'weight' => $value['weight'],
-      ))->execute();
-    }
-  }
-  return;
-}
-
-/**
- * Insert userreference grants from a node.
+ * Insert user_reference grants from a node.
  *
  * @param Object $node
  */
@@ -941,24 +900,24 @@ function nodeaccess_get_grants($node) {
   $grants = array();
 
   // Load grants by roles.
-  $query = db_select('role', 'r');
-  $query->leftJoin('nodeaccess_role_alias', 'nra', 'nra.rid = r.rid');
-  $query->leftJoin('node_access', 'na', 'na.gid = r.rid AND na.realm = :realm AND na.nid = :nid', array(':realm' => 'nodeaccess_rid', ':nid' => $node->nid));
-  $query->fields('r', array('rid'));
-  $query->fields('nra', array('name'));
-  $query->fields('na', array('grant_view', 'grant_update', 'grant_delete'));
-  $query->orderBy('nra.weight');
-  $query->orderBy('nra.name');
-  $result = $query->execute();
+  $roles = user_roles();
+  foreach ($roles as $machine => $name) {
+    $query = db_select('node_access', 'na');
+    // AND na.realm = :realm AND na.nid = :nid', array(':realm' => 'nodeaccess_rid', ':nid' => $node->nid));
+    $query->fields('na', array('grant_view', 'grant_update', 'grant_delete'));
+    $query->condition('na.realm', 'nodeaccess_rid', '=');
+    $query->condition('na.nid', $node->nid, '=');
+    $result = $query->execute();
+    $grants = $result->fetchObject();
 
-  while ($grant = $result->fetch()) {
-    $grants['rid'][$grant->rid] = array(
-      'name' => empty($grant->name) ? '' : check_plain($grant->name),
+    $grants['rid'][$machine] = array(
+      'name' => empty($name) ? '' : check_plain($name),
       'grant_view' => (bool) $grant->grant_view,
       'grant_update' => (bool) $grant->grant_update,
       'grant_delete' => (bool) $grant->grant_delete,
     );
   }
+  
   // Load grants by users
   $query = db_select('node_access', 'na');
   $query->join('users', 'u', 'u.uid = na.gid');
@@ -1068,7 +1027,7 @@ function nodeaccess_save_grant($node, $grant) {
       ->execute();
   }
   catch (Exception $e) {
-    drupal_set_message(t("Database error has occurred while saving to nodeaccess table."), 'error');
+    backdrop_set_message(t("Database error has occurred while saving to nodeaccess table."), 'error');
     watchdog('nodeaccess', 'Database error: @message.', array('@message' => $e->getMessage()), WATCHDOG_ERROR);
   }
 }

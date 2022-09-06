@@ -71,6 +71,25 @@ function nodeaccess_install() {
   // Set up all permissions to be editable by default.
   $grant_prefs = array('view' => 1, 'edit' => 1, 'delete' => 1);
   variable_set('nodeaccess-grants', $grant_prefs);
+
+  $config = config('nodeaccess.settings');
+  $roles = user_roles(FALSE, NULL, TRUE);
+
+  /**
+   * Set up an ID for our roles that way we can use them with our various node_access
+   * grants (our nodeaccess ones too!). This becomes the gid for role based access
+   * permissions.
+   */
+  $i = 0;
+  $roles_gids = [];
+  foreach ($roles as $role_id => $role) {
+    $roles_gids[$role_id] = stdClass();
+    $roles_gids[$role_id]->name = $role->name;
+    $roles_gids[$role_id]->weight = $role->weight;
+    $i++;
+  }
+  $config->set('role_map', $roles_gids);
+  $config->save();
 }
 
 /**
@@ -86,8 +105,8 @@ function nodeaccess_schema() {
         'default' => 0,
       ),
       'gid' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
+        'type' => 'varchar',
+        'length' => 64,
         'not null' => TRUE,
         'default' => 0,
       ),
@@ -121,28 +140,6 @@ function nodeaccess_schema() {
     ),
     'primary key' => array('nid', 'gid', 'realm'),
   );
-  $schema['nodeaccess_role_alias'] = array(
-    'fields' => array(
-      'rid' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'name' => array(
-        'type' => 'varchar',
-        'length' => 50,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'weight' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-    ),
-    'primary key' => array('rid'),
-  );
   return $schema;
 }
 
@@ -162,12 +159,5 @@ function nodeaccess_uninstall() {
     variable_del('nodeaccess_' . $type . '_userreference');
   }
   // Remove tables.
-  drupal_uninstall_schema('nodeaccess');
-}
-
-/**
- * Flag nodeaccess permissions as needing a rebuild. Rebuild permissions from the status page.
- */
-function nodeaccess_update_7105() {
-  node_access_needs_rebuild();
+  backdrop_uninstall_schema('nodeaccess');
 }
