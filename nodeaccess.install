@@ -83,7 +83,7 @@ function nodeaccess_install() {
   $i = 0;
   $roles_gids = [];
   foreach ($roles as $role_id => $role) {
-    $roles_gids[$role_id] = stdClass();
+    $roles_gids[$role_id] = new stdClass;
     $roles_gids[$role_id]->name = $role->name;
     $roles_gids[$role_id]->weight = $role->weight;
     $i++;

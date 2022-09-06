@@ -93,7 +93,6 @@ function nodeaccess_admin_form($form, $form_state) {
   );
 
   foreach ($roles as $id => $role) {
-    // Catch NULL values.
     if (!$role->weight) {
       $role['weight'] = 0;
     }
@@ -103,12 +102,12 @@ function nodeaccess_admin_form($form, $form_state) {
     );
     $form['role'][$id]['allow'] = array(
       '#type' => 'checkbox',
-      '#title' => check_plain($role->label),
+      '#title' => check_plain($role['name']),
       '#default_value' => isset($allowed_roles[$id]) ? $allowed_roles[$id] : 0,
     );
     $form['role'][$id]['weight'] = array(
       '#type' => 'weight',
-      '#default_value' => $role->weight,
+      '#default_value' => $role['weight'],
       '#delta' => 10,
     );
   }
