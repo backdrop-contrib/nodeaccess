@@ -22,6 +22,9 @@ function nodeaccess_disable() {
  * Implements hook_install().
  */
 function nodeaccess_install() {
+  $config = config('nodeaccess.settings');
+  $roles = user_roles(FALSE, NULL, TRUE);
+
   // Set up default permissions to be view for authenticated and
   // anonymous users, and all permissions for author.
   $grants = array();
@@ -43,7 +46,8 @@ function nodeaccess_install() {
     'grant_view' => $role_perms[2]['access content'],
   );
   $author_prefs = array();
-  foreach (node_type_get_types() as $type => $name) {
+  $node_types = node_type_get_types();
+  foreach ($node_types as $type => $name) {
     // We check the edit permissions for anonymous and authenticated users.
     $edit_perm = 'edit any ' . $type . ' content';
     $role_perms[1][$edit_perm] = isset($role_perms[1][$edit_perm])?
@@ -60,20 +64,18 @@ function nodeaccess_install() {
                                       intval($role_perms[2][$delete_perm]) : 0;
     $grants[0]['grant_delete'] = $role_perms[1][$delete_perm];
     $grants[1]['grant_delete'] = $role_perms[2][$delete_perm];
-    variable_set('nodeaccess_' . $type, $grants);
+    $config->set('nodeaccess_' . $type, $grants);
     $author_prefs[$type] = array(
       'grant_view' => 0,
       'grant_update' => 0,
       'grant_delete' => 0,
     );
   }
-  variable_set('nodeaccess_authors', $author_prefs);
+  $config->set('authors', $author_prefs);
+
   // Set up all permissions to be editable by default.
   $grant_prefs = array('view' => 1, 'edit' => 1, 'delete' => 1);
-  variable_set('nodeaccess-grants', $grant_prefs);
-
-  $config = config('nodeaccess.settings');
-  $roles = user_roles(FALSE, NULL, TRUE);
+  $config->set('allowed_grants', $grant_prefs);
 
   /**
    * Set up an ID for our roles that way we can use them with our various node_access
@@ -83,9 +85,9 @@ function nodeaccess_install() {
   $i = 0;
   $roles_gids = [];
   foreach ($roles as $role_id => $role) {
-    $roles_gids[$role_id] = new stdClass;
-    $roles_gids[$role_id]->name = $role->name;
-    $roles_gids[$role_id]->weight = $role->weight;
+    $roles_gids[$i] = new stdClass;
+    $roles_gids[$i]->name = $role->name;
+    $roles_gids[$i]->weight = $role->weight;
     $i++;
   }
   $config->set('role_map', $roles_gids);
@@ -105,8 +107,8 @@ function nodeaccess_schema() {
         'default' => 0,
       ),
       'gid' => array(
-        'type' => 'varchar',
-        'length' => 64,
+        'type' => 'int',
+        'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
       ),

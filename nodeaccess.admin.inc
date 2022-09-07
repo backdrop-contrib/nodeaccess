@@ -8,7 +8,7 @@
  * Menu callback. Draws the admin page.
  */
 function nodeaccess_admin() {
-  return drupal_get_form('nodeaccess_admin_form');
+  return backdrop_get_form('nodeaccess_admin_form');
 }
 
 /**
@@ -23,12 +23,12 @@ function nodeaccess_admin_form($form, $form_state) {
   // Load in our configurations
   $config = config('nodeaccess.settings');
 
-  // Set defaults from variable_get.
-  $show = variable_get('nodeaccess-types', array());
-  $roles =  $config->get('role_map');
+  // Set defaults from configuration management
+  $show = $config->get('types');
+  $roles = $config->get('role_map');
 
   $allowed_roles = $config->get('allowed_roles');
-  $allowed_grants = variable_get('allowed_grants');
+  $allowed_grants = $config->get('allowed_grants');
 
   $form['priority'] = array(
     '#type' => 'checkbox',
@@ -93,12 +93,12 @@ function nodeaccess_admin_form($form, $form_state) {
   );
 
   foreach ($roles as $id => $role) {
-    if (!$role->weight) {
+    if (!$role['weight']) {
       $role['weight'] = 0;
     }
     $form['role'][$id]['name'] = array(
       '#type' => 'hidden',
-      '#value' => $role->name,
+      '#value' => $role['name'],
     );
     $form['role'][$id]['allow'] = array(
       '#type' => 'checkbox',
@@ -123,7 +123,8 @@ function nodeaccess_admin_form($form, $form_state) {
   );
 
   $options = array();
-  foreach (node_type_get_types() as $type => $bundle) {
+  $node_types = node_type_get_types();
+  foreach ($node_types as $type => $bundle) {
     $options[$type] = array(
       'content_type' => check_plain($bundle->name),
     );
@@ -139,7 +140,7 @@ function nodeaccess_admin_form($form, $form_state) {
   );
 
   // Generate fieldsets for each node type.
-  foreach (node_type_get_types() as $type => $bundle) {
+  foreach ($node_types as $type => $bundle) {
     $form['nodeaccess'][$type] = array(
       '#type' => 'fieldset',
       '#collapsible' => TRUE,
@@ -150,7 +151,7 @@ function nodeaccess_admin_form($form, $form_state) {
     );
 
     // Set default author permissions for node type.
-    $author_prefs = variable_get('nodeaccess_authors', array());
+    $author_prefs = $config->get('authors');
     $form['nodeaccess'][$type]['author']['grant_view'] = array(
       '#type' => 'checkbox',
       '#default_value' => $author_prefs[$type]['grant_view'],
@@ -164,13 +165,14 @@ function nodeaccess_admin_form($form, $form_state) {
       '#default_value' => $author_prefs[$type]['grant_delete'],
     );
 
-    $perms = variable_get('nodeaccess_' . $type, array());
+    $perms = $config->get('nodeaccess_' . $type);
     foreach ($perms as $perm) {
       $opts[$perm['gid']] = $perm;
     }
 
     // Set default role permissions for node type.
-    foreach (user_roles() as $id => $role) {
+    $user_roles = user_roles();
+    foreach ($user_roles as $id => $role) {
       $form['nodeaccess'][$type]['roles'][$id]['name'] = array('#markup' => $role);
       $form['nodeaccess'][$type]['roles'][$id]['grant_view'] = array(
         '#type' => 'checkbox',
@@ -191,7 +193,7 @@ function nodeaccess_admin_form($form, $form_state) {
     if (module_exists('user_reference')) {
       $bundle = field_extract_bundle('node', $bundle);
       $fields = field_info_instances('node', $bundle);
-      $user_reference_perms = variable_get('nodeaccess_' . $type . '_user_reference', array());
+      $user_reference_perms = $config->get('nodeaccess_' . $type . '_user_reference');
 
       $field_types = field_info_field_types();
 
@@ -244,32 +246,33 @@ function nodeaccess_admin_form($form, $form_state) {
  * @param $form_state
  */
 function nodeaccess_admin_form_submit($form, $form_state) {
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+
   $form_values = $form_state['values'];
   $allowed_grants = array();
   // Save priority.
-  variable_set('nodeaccess-priority', $form_values['priority']);
+  $config->set('priority', $form_values['priority']);
   // Save preserve.
-  variable_set('nodeaccess-preserve', $form_values['preserve']);
+  $config->set('preserve', $form_values['preserve']);
   // Save allowed grants.
   foreach ($form_values['grant'] as $id => $val) {
     $allowed_grants[$id] = $val;
   }
-  variable_set('nodeaccess-grants', $allowed_grants);
+  $config->set('allowed_grants', $allowed_grants);
 
   // Iterate through the allowed roles and re-save into our 
   // configuration. No aliases. Just names and weights.
   $allowed_roles = array();
   foreach ($form_values['role'] as $id => $val) {
-    if (empty($id)) {
-      continue;
-    }
     $allowed_roles[$id] = $val['allow'];
   }
-  variable_set('nodeaccess-roles', $allowed_roles);
+  $config->set('allowed_roles', $allowed_roles);
 
   // Save author and role permissions for each node type.
   $author_prefs = array();
-  foreach (node_type_get_types() as $type => $name) {
+  $node_types = node_type_get_types();
+  foreach ($node_types as $type => $name) {
     $grants = array();
     foreach ($form_values[$type]['roles'] as $role => $val) {
       $grants[] = array(
@@ -280,7 +283,7 @@ function nodeaccess_admin_form_submit($form, $form_state) {
         'grant_delete' => $val['grant_delete'],
       );
     }
-    variable_set('nodeaccess_' . $type, $grants);
+    $config->set('nodeaccess_' . $type, $grants);
     $author_prefs[$type] = $form_values[$type]['author'];
     // Also save userreference default permissions if enabled.
     if (module_exists('user_reference') && isset($form_values[$type]['user_reference'])) {
@@ -294,20 +297,20 @@ function nodeaccess_admin_form_submit($form, $form_state) {
           'grant_delete' => $val['grant_delete'],
         );
       }
-      variable_set('nodeaccess_' . $type . '_user_reference', $user_reference_grants);
+      $config->set('nodeaccess_' . $type . '_user_reference', $user_reference_grants);
     }
   }
-  variable_set('nodeaccess_authors', $author_prefs);
+  $config->set('authors', $author_prefs);
 
   // Save allowed node type grant tab.
   $allowed_types = array();
   foreach ($form_values['tabs']['show'] as $type => $value) {
     $allowed_types[$type] = (bool) $value;
   }
-
+  $config->set('types', $allowed_types);
+  $config->save();
   nodeaccess_set_type_grants($allowed_types);
-
-  drupal_set_message(t('Grants saved.'));
+  backdrop_set_message(t('Grants saved.'));
 }
 
 /**
@@ -360,25 +363,25 @@ function theme_nodeaccess_admin_form_roles($variables) {
  */
 function theme_nodeaccess_admin_form_types($variables) {
   $form = $variables['form'];
-  $output = drupal_render($form['show']);
+  $output = backdrop_render($form['show']);
   $roles = element_children($form['roles']);
   $header = array(t('Role'), t('View'), t('Edit'), t('Delete'));
   $rows = array();
   foreach ($roles as $role) {
     $row = array();
-    $row[] = drupal_render($form['roles'][$role]['name']);
-    $row[] = drupal_render($form['roles'][$role]['grant_view']);
-    $row[] = drupal_render($form['roles'][$role]['grant_update']);
-    $row[] = drupal_render($form['roles'][$role]['grant_delete']);
+    $row[] = backdrop_render($form['roles'][$role]['name']);
+    $row[] = backdrop_render($form['roles'][$role]['grant_view']);
+    $row[] = backdrop_render($form['roles'][$role]['grant_update']);
+    $row[] = backdrop_render($form['roles'][$role]['grant_delete']);
     $rows[] = $row;
   }
   $output .= theme('table', array('header' => $header, 'rows' => $rows));
   $header = array(t('Author Settings'), t('View'), t('Edit'), t('Delete'));
   $row = array();
   $row[] = t('Node author');
-  $row[] = drupal_render($form['author']['grant_view']);
-  $row[] = drupal_render($form['author']['grant_update']);
-  $row[] = drupal_render($form['author']['grant_delete']);
+  $row[] = backdrop_render($form['author']['grant_view']);
+  $row[] = backdrop_render($form['author']['grant_update']);
+  $row[] = backdrop_render($form['author']['grant_delete']);
 
   $output .= theme('table', array('header' => $header, 'rows' => array($row)));
 
@@ -399,10 +402,10 @@ function theme_nodeaccess_admin_form_types($variables) {
       $row = array();
 
       $row[] = $form['user_reference'][$user_reference_field]['name']['#value'];
-      $row[] = drupal_render($form['user_reference'][$user_reference_field]['enabled']);
-      $row[] = drupal_render($form['user_reference'][$user_reference_field]['grant_view']);
-      $row[] = drupal_render($form['user_reference'][$user_reference_field]['grant_update']);
-      $row[] = drupal_render_children($form['user_reference'][$user_reference_field]['grant_delete']);
+      $row[] = backdrop_render($form['user_reference'][$user_reference_field]['enabled']);
+      $row[] = backdrop_render($form['user_reference'][$user_reference_field]['grant_view']);
+      $row[] = backdrop_render($form['user_reference'][$user_reference_field]['grant_update']);
+      $row[] = backdrop_render_children($form['user_reference'][$user_reference_field]['grant_delete']);
       $rows[] = $row;
     }
     $output .= theme('table', array(

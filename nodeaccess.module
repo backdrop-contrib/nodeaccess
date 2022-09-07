@@ -5,7 +5,6 @@
  * Provide per node access control
  */
 
-
 /**
  * Implements hook_help().
  *
@@ -53,8 +52,8 @@ function nodeaccess_menu() {
 
   $items['node/%node/grant'] = array(
     'title' => 'Grant',
-    'page callback' => 'nodeaccess_grant_tab',
-    'page arguments' => array(1),
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('nodeaccess_grants_form', 1),
     'access callback' => 'nodeaccess_access',
     'access arguments' => array('grant', 1),
     'weight' => 5,
@@ -150,23 +149,25 @@ function nodeaccess_node_access($node, $op, $account) {
  *   Whether the user has access to the grant tab.
  */
 function nodeaccess_access($op, $node, $account = NULL) {
-  global $user;
-  if (!$node) {
+ // Load in our configurations
+  $config = config('nodeaccess.settings');
 
+  global $user;
+  if (empty($node)) {
     return FALSE;
   }
 
-  // Apparently D7 no longer defaults to admin getting anything?
-  if (user_access('administer nodeaccess')) {
+  // // Apparently D7 no longer defaults to admin getting anything?
+  // if (user_access('administer nodeaccess')) {
 
-    return TRUE;
-  }
+  //   return TRUE;
+  // }
 
   // If no user object is supplied, the access check is for the current user.
   if (empty($account)) {
     $account = $user;
   }
-  $allowed_types = variable_get('nodeaccess-types', array());
+  $allowed_types = $config->get('types');
   if ($op == 'grant') {
     if ($node->nid && isset($allowed_types[$node->type]) && !empty($allowed_types[$node->type]) &&
       (user_access('grant node permissions', $account) ||
@@ -193,7 +194,6 @@ function nodeaccess_access($op, $node, $account = NULL) {
  * @return array
  */
 function nodeaccess_theme($existing, $type, $theme, $path) {
-
   return array(
     'nodeaccess_admin_form_roles' => array(
       'render element'  => 'form',
@@ -207,7 +207,6 @@ function nodeaccess_theme($existing, $type, $theme, $path) {
   );
 }
 
-
 /**
  * Menu callback. Draws the grant tab.
  *
@@ -216,9 +215,9 @@ function nodeaccess_theme($existing, $type, $theme, $path) {
  * @return array
  *   Form array.
  */
-function nodeaccess_grant_tab($node) {
-  return drupal_get_form('nodeaccess_grants_form', $node);
-}
+// function nodeaccess_grant_tab($node) {
+//   return backdrop_get_form('nodeaccess_grants_form', $node);
+// }
 
 /**
  * Menu callback. Draws the grant tab.
@@ -237,6 +236,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
   if (!isset($form_values)) {
     $form_values = array();
     $grants = nodeaccess_get_grants($node);
+
     $form_values['rid'] = isset($grants['rid']) ? $grants['rid'] : array();
     $form_values['uid'] = isset($grants['uid']) ? $grants['uid'] : array();
   }
@@ -286,9 +286,10 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
   // Open our Backdrop configuration for the module and read in
   // the settings.
   $config = config('nodeaccess.settings');
-  $allowed_roles =  $config->get('allowed_roles', array());
-  $allowed_grants = $config->get('allowed_grants', array());
-  
+  $allowed_roles =  $config->get('allowed_roles');
+  $allowed_grants = $config->get('allowed_grants');
+  $role_map = $config->get('role_map');
+
   // If $preserve is TRUE, the fields the user is not allowed to view or
   // edit are included in the form as hidden fields to preserve them.
   $preserve = $config->get('preserve', TRUE);
@@ -297,6 +298,8 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
   if (is_array($roles)) {
     $form['rid'] = array('#tree' => TRUE);
     foreach ($roles as $key => $field) {
+//      $key = nodeaccess_get_role_name_from_machine($key);
+
       if (isset($allowed_roles[$key]) && $allowed_roles[$key]) {
         $form['rid'][$key]['name'] = array(
           '#type' => 'hidden',
@@ -359,7 +362,6 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
       }
     }
   }
-
   // Users table.
   if (is_array($users)) {
     $form['uid'] = array('#tree' => TRUE);
@@ -525,12 +527,16 @@ function _nodeaccess_grants_form_submit($form, &$form_state) {
  * @return string
  */
 function theme_nodeaccess_grants_form($vars) {
+   // Load in our configurations
+  $config = config('nodeaccess.settings');
+  $role_map = $config->get('role_map');
+
   $output = '';
 
   $form = $vars['form'];
   $rows = array();
-  $allowed_roles = variable_get('nodeaccess-roles', array());
-  $allowed_grants = variable_get('nodeaccess-grants', array());
+  $allowed_roles = $config->get('allowed_roles');
+  $allowed_grants = $config->get('allowed_grants');
   // Retrieve role names for columns.
   $roles = user_roles();
 
@@ -556,7 +562,7 @@ function theme_nodeaccess_grants_form($vars) {
     foreach ($roles as $key => $role) {
       if (isset($allowed_roles[$key]) && $allowed_roles[$key]) {
         $row = array();
-        $row[] = $role_names[$key] . backdrop_render($form['rid'][$key]['name']);
+        $row[] = $role_map[$key]['name'] . backdrop_render($form['rid'][$key]['name']);
 
         if ($allowed_grants['view']) {
           $row[] = backdrop_render($form['rid'][$key]['grant_view']);
@@ -604,22 +610,22 @@ function theme_nodeaccess_grants_form($vars) {
     foreach ($users as $key) {
       $row = array();
       $row[] = $form['uid'][$key]['name']['#value'];
-      $row[] = drupal_render($form['uid'][$key]['keep']);
+      $row[] = backdrop_render($form['uid'][$key]['keep']);
       if ($allowed_grants['view']) {
-        $row[] = drupal_render($form['uid'][$key]['grant_view']);
+        $row[] = backdrop_render($form['uid'][$key]['grant_view']);
       }
       if ($allowed_grants['edit']) {
-        $row[] = drupal_render($form['uid'][$key]['grant_update']);
+        $row[] = backdrop_render($form['uid'][$key]['grant_update']);
       }
       if ($allowed_grants['delete']) {
-        $row[] = drupal_render($form['uid'][$key]['grant_delete']);
+        $row[] = backdrop_render($form['uid'][$key]['grant_delete']);
       }
       $rows[] = $row;
     }
     $output .= theme('table', array('header' => $header, 'rows' => $rows));
   }
 
-  $output .= drupal_render_children($form);
+  $output .= backdrop_render_children($form);
 
   return $output;
 }
@@ -648,8 +654,11 @@ function nodeaccess_node_grants($account, $op) {
  * @param Object $node
  */
 function nodeaccess_node_update($node) {
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+
   if (module_exists('user_reference')) {
-    $fields = variable_get('nodeaccess_' . $node->type . '_user_reference', array());
+    $fields = $config->get('nodeaccess_' . $node->type . '_user_reference');
     foreach (array_keys($fields) as $field_name) {
       if (isset($node->$field_name)) {
         $old_node = node_load($node->nid);
@@ -683,12 +692,15 @@ function nodeaccess_node_delete($node) {
  * @return array|NULL
  */
 function nodeaccess_node_access_records($node) {
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+
   if (nodeaccess_disabling() || !$node->status) {
     return NULL;
   }
 
   // Need to find out if node has own grants or whether to use defaults.
-  $default = variable_get('nodeaccess_' . $node->type, array());
+  $default = $config->get('nodeaccess_' . $node->type);
 
   // Setup default keys that are required by node_access_write_grants().
   $grant_defaults = array(
@@ -717,7 +729,8 @@ function nodeaccess_node_access_records($node) {
   }
 
   // Apply author grants.
-  $author_prefs = variable_get('nodeaccess_authors', array());
+  $author_prefs = $config->get('authors');
+
   // Array is pre-populated with grant values.
   $grant = $author_prefs[$node->type];
   $grant['gid'] = $node->uid;
@@ -755,18 +768,21 @@ function nodeaccess_disabling($set = NULL) {
   return $disabling;
 }
 
-
 /**
  * Implements hook_node_type_delete().
  *
  * @param Object $info
  */
 function nodeaccess_node_type_delete($info) {
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+
   // Node type is being deleted, delete its preferences.
-  variable_del('nodeaccess_' . $info->type);
+  $config->get('nodeaccess_' . $info->type);
   $author_prefs = variable_get('nodeaccess_authors', array());
   unset($author_prefs[$info->type]);
-  variable_set('nodeaccess_authors', $author_prefs);
+  $config->set('nodeaccess_authors', $author_prefs);
+  $config->save();
 }
 
 
@@ -776,19 +792,23 @@ function nodeaccess_node_type_delete($info) {
  * @param Object $info
  */
 function nodeaccess_node_type_update($info) {
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+
   // Node type has changed, move preferences to new type.
   if (!empty($info->old_type) && $info->old_type != $info->type) {
-    $setting = variable_get('nodeaccess_' . $info->old_type, array());
-    variable_del('nodeaccess_' . $info->old_type);
-    variable_set('nodeaccess_' . $info->type, $setting);
-    $author_prefs = variable_get('nodeaccess_authors', array());
+    $setting = $config->get('nodeaccess_' . $info->old_type, array());
+    $config->clear('nodeaccess_' . $info->old_type);
+    $config->set('nodeaccess_' . $info->type, $setting);
+    $author_prefs = $config->get('authors', array());
     $author_prefs[$info->type] = array(
       'grant_view' => $author_prefs[$info->old_type]['grant_view'],
       'grant_update' => $author_prefs[$info->old_type]['grant_update'],
       'grant_delete' => $author_prefs[$info->old_type]['grant_delete'],
     );
     unset($author_prefs[$info->old_type]);
-    variable_set('nodeaccess_authors', $author_prefs);
+    $config->set('nodeaccess_authors', $author_prefs);
+    $config->save();
   }
 }
 
@@ -799,6 +819,9 @@ function nodeaccess_node_type_update($info) {
  * @param Object $info
  */
 function nodeaccess_node_type_insert($info) {
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+
   // New node type, default to whatever is set for access content permission.
   $role_perms = user_role_permissions(array(1 => 1, 2 => 2));
   $role_perms[DRUPAL_ANONYMOUS_RID]['access content'] = isset($role_perms[1]['access content']) ?
@@ -819,7 +842,7 @@ function nodeaccess_node_type_insert($info) {
     'grant_update' => 0,
     'grant_delete' => 0,
   );
-  variable_set('nodeaccess_' . $info->type, $grants);
+  $config->set('nodeaccess_' . $info->type, $grants);
 
   // Add permissions for author.
   $author_prefs = variable_get('nodeaccess_authors', array());
@@ -829,7 +852,8 @@ function nodeaccess_node_type_insert($info) {
     'grant_delete' => 0,
   );
 
-  variable_set('nodeaccess_authors', $author_prefs);
+  $config->set('nodeaccess_authors', $author_prefs);
+  $config->save();
   node_access_needs_rebuild(TRUE);
 }
 
@@ -839,10 +863,13 @@ function nodeaccess_node_type_insert($info) {
  * @param Object $node
  */
 function nodeaccess_insert_user_reference($node) {
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+
   $form_values = nodeaccess_get_grants($node);
   // Now, append or overwrite the uid with what was specified in the user
   // reference field.
-  $fields = variable_get('nodeaccess_' . $node->type . '_user_reference', array());
+  $fields = $config->get('nodeaccess_' . $node->type . '_user_reference');
   foreach ($fields as $field_name => $field) {
     $user_uids = field_get_items('node', $node, $field_name);
     $user_references = user_load_multiple($user_uids);
@@ -871,10 +898,13 @@ function nodeaccess_insert_user_reference($node) {
  * @param Object $node
  */
 function nodeaccess_delete_user_reference($node) {
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+
   $form_values = nodeaccess_get_grants($node);
   // Now, append or overwrite the uid with what was specified in the user
   // reference field.
-  $fields = variable_get('nodeaccess_' . $node->type . '_user_reference', array());
+  $fields = $config->get('nodeaccess_' . $node->type . '_user_reference');
   foreach ($fields as $field_name => $field) {
     $user_uids = field_get_items('node', $node, $field_name);
     $user_references = user_load_multiple($user_uids);
@@ -902,15 +932,16 @@ function nodeaccess_get_grants($node) {
   // Load grants by roles.
   $roles = user_roles();
   foreach ($roles as $machine => $name) {
-    $query = db_select('node_access', 'na');
+    $key = nodeaccess_get_role_name_from_machine($machine);
+    $query = db_select('nodeaccess', 'na');
     // AND na.realm = :realm AND na.nid = :nid', array(':realm' => 'nodeaccess_rid', ':nid' => $node->nid));
     $query->fields('na', array('grant_view', 'grant_update', 'grant_delete'));
     $query->condition('na.realm', 'nodeaccess_rid', '=');
     $query->condition('na.nid', $node->nid, '=');
+    $query->condition('na.gid', $key, '=');
     $result = $query->execute();
-    $grants = $result->fetchObject();
-
-    $grants['rid'][$machine] = array(
+    $grant = $result->fetchObject();
+    $grants['rid'][$key] = array(
       'name' => empty($name) ? '' : check_plain($name),
       'grant_view' => (bool) $grant->grant_view,
       'grant_update' => (bool) $grant->grant_update,
@@ -950,19 +981,19 @@ function nodeaccess_get_grants($node) {
  */
 function nodeaccess_set_grants($node, $grants = array()) {
   // Allow other modules to edit all grants for array.
-  drupal_alter('nodeaccess_grants', $grants, $node);
+  backdrop_alter('nodeaccess_grants', $grants, $node);
 
   nodeaccess_delete_grants($node);
 
   if (count($grants)) {
     foreach ($grants as $grant) {
       // Allow other modules to edit single grants.
-      drupal_alter('nodeaccess_grant', $grant, $node);
+      backdrop_alter('nodeaccess_grant', $grant, $node);
       nodeaccess_save_grant($node, $grant);
     }
   }
-
   node_access_acquire_grants($node);
+  node_access_rebuild(FALSE);
 }
 
 
@@ -981,9 +1012,10 @@ function nodeaccess_delete_grants($node) {
     node_access_acquire_grants($node);
   }
   catch (Exception $e) {
-    drupal_set_message(t("Database error has occurred while clearing nodeaccess table."), 'error');
+    backdrop_set_message(t("Database error has occurred while clearing nodeaccess table."), 'error');
     watchdog('nodeaccess', 'Database error: @message.', array('@message' => $e->getMessage()), WATCHDOG_ERROR);
   }
+  
 }
 
 /**
@@ -1057,7 +1089,6 @@ function nodeaccess_delete_type_grant($type) {
   if (isset($grants[$type])) {
     unset($grants[$type]);
   }
-
   nodeaccess_set_type_grants($grants);
 }
 
@@ -1072,7 +1103,29 @@ function nodeaccess_set_type_grants($types = array()) {
   if (!is_array($types)) {
     return;
   }
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+  // Update our node type grants.
+  $config->set('types', $types);
+  $config->save();
 
-  variable_set('nodeaccess-types', $types);
   node_access_needs_rebuild(TRUE);
+}
+
+/**
+ * Get the role name from our machine name used by backdrop and 
+ * mapped when we install our module or add a new role.
+ */
+function nodeaccess_get_role_name_from_machine($machine) {
+  $config = config('nodeaccess.settings');
+  
+  // Update our node type grants.
+  $map = $config->get('role_map');
+ 
+  foreach ($map as $key => $definition) {
+    if ($definition['name'] == $machine) {
+      return $key;
+    }
+  }
+  return FALSE;
 }
