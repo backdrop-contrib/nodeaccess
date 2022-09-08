@@ -83,7 +83,7 @@ function nodeaccess_install() {
    * permissions.
    */
   $i = 0;
-  $roles_gids = [];
+  $roles_gids = array();
   foreach ($roles as $role_id => $role) {
     $roles_gids[$i] = new stdClass;
     $roles_gids[$i]->name = $role->name;

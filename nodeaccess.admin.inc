@@ -6,13 +6,6 @@
 
 /**
  * Menu callback. Draws the admin page.
- */
-function nodeaccess_admin() {
-  return backdrop_get_form('nodeaccess_admin_form');
-}
-
-/**
- * Menu callback. Draws the admin page.
  *
  * @param $form
  * @param $form_state
@@ -22,6 +15,23 @@ function nodeaccess_admin() {
 function nodeaccess_admin_form($form, $form_state) {
   // Load in our configurations
   $config = config('nodeaccess.settings');
+
+  /**
+   * In the event new roles get added, we need to add them to our role map.
+   * I am not crazy about this, but I can't find a hook that fires when a
+   * new role is created.
+   */
+  $roles = user_roles(FALSE, NULL, TRUE);
+  $i = 0;
+  $roles_gids = array();
+  foreach ($roles as $role_id => $role) {
+    $roles_gids[$i] = new stdClass;
+    $roles_gids[$i]->name = $role->name;
+    $roles_gids[$i]->weight = $role->weight;
+    $i++;
+  }
+  $config->set('role_map', $roles_gids);
+  $config->save();
 
   // Set defaults from configuration management
   $show = $config->get('types');
@@ -93,21 +103,21 @@ function nodeaccess_admin_form($form, $form_state) {
   );
 
   foreach ($roles as $id => $role) {
-    if (!$role['weight']) {
-      $role['weight'] = 0;
+    if (!$role->weight) {
+      $role->weight = 0;
     }
     $form['role'][$id]['name'] = array(
       '#type' => 'hidden',
-      '#value' => $role['name'],
+      '#value' => $role->name,
     );
     $form['role'][$id]['allow'] = array(
       '#type' => 'checkbox',
-      '#title' => check_plain($role['name']),
+      '#title' => check_plain($role->name),
       '#default_value' => isset($allowed_roles[$id]) ? $allowed_roles[$id] : 0,
     );
     $form['role'][$id]['weight'] = array(
       '#type' => 'weight',
-      '#default_value' => $role['weight'],
+      '#default_value' => $role->weight,
       '#delta' => 10,
     );
   }

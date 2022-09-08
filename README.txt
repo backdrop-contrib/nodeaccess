@@ -1,18 +1,16 @@
 Node Access Module
 
-(Hopelessly out of date)
-
 This module allows you to manage permissions for nodes by role and user. In other words,
 it implements per node access control for users and groups. With this module, you can
 restrict access to any individual node without having to use taxonomy. You can assign 
 permission to view, edit or delete each individual node by user or role. Once enabled,
-a 'grant' tab will appear on node pages. You can click this and assign permissions for 
+a 'grant' tab will appear on node edit pages. You can click this and assign permissions for 
 that node.
 
 
 INSTALLATION:
 
-Put the module in your drupal modules directory and enable it in admin/modules.
+Put the module in your Backdrop modules directory and enable it in admin/modules.
 
 I would strongly recommend backing up your database before installing
 this module...
@@ -56,5 +54,4 @@ who is a member of authenticated users. For example, if you wanted all users to 
 to edit a node except for one user, you cannot do this by granted edit permission to 
 authenticated users, then adding the user to the node without view permissions. Drupal
 doesn't let you do that.
-
 

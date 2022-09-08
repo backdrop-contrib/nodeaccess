@@ -45,7 +45,8 @@ function nodeaccess_menu() {
   $items['admin/config/people/nodeaccess'] = array(
     'title' => 'Nodeaccess',
     'description' => 'Change default settings for the Nodeaccess module.',
-    'page callback' => 'nodeaccess_admin',
+    'page arguments' => array('nodeaccess_admin_form'),
+    'page callback' => 'backdrop_get_form',
     'file' => 'nodeaccess.admin.inc',
     'access arguments' => array('administer nodeaccess'),
   );
@@ -115,7 +116,7 @@ function nodeaccess_permission() {
  * @return string
  */
 function nodeaccess_node_access($node, $op, $account) {
-
+  $anonymous_rid = nodeaccess_get_role_id_from_machine(DRUPAL_ANONYMOUS_RID);
   switch ($op) {
     case 'update':
     case 'delete':
@@ -128,8 +129,8 @@ function nodeaccess_node_access($node, $op, $account) {
         $grants = nodeaccess_get_grants($node);
         // We check if the role has particular access to this node.
         // If anonymous has rights to this node, we allow them.
-        if ((!empty($grants['rid'][DRUPAL_ANONYMOUS_RID]['grant_update']) && $op == 'update') ||
-            (!empty($grants['rid'][DRUPAL_ANONYMOUS_RID]['grant_delete']) && $op == 'delete')) {
+        if ((!empty($grants['rid'][$anonymous_rid]['grant_update']) && $op == 'update') ||
+            (!empty($grants['rid'][$anonymous_rid]['grant_delete']) && $op == 'delete')) {
           return NODE_ACCESS_ALLOW;
         }
         return NODE_ACCESS_DENY;
@@ -210,18 +211,6 @@ function nodeaccess_theme($existing, $type, $theme, $path) {
 /**
  * Menu callback. Draws the grant tab.
  *
- * @param Object $node
- *
- * @return array
- *   Form array.
- */
-// function nodeaccess_grant_tab($node) {
-//   return backdrop_get_form('nodeaccess_grants_form', $node);
-// }
-
-/**
- * Menu callback. Draws the grant tab.
- *
  * @param $form
  * @param $form_state
  * @param $node
@@ -252,17 +241,20 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
       $query->condition('uid', $uid, 'NOT IN');
     }
 
+    $authenticated_rid = nodeaccess_get_role_id_from_machine(DRUPAL_AUTHENTICATED_RID);
+
+
     $result = $query->execute();
     while ($account = $result->fetch()) {
       $form_values['uid'][$account->uid] = array(
         'name' => $account->name,
         'keep' => 1,
-        'grant_view' => isset($form_values['rid'][DRUPAL_AUTHENTICATED_RID]['grant_view']) ?
-          $form_values['rid'][DRUPAL_AUTHENTICATED_RID]['grant_view'] : 0,
-        'grant_update' => isset($form_values['rid'][DRUPAL_AUTHENTICATED_RID]['grant_update']) ?
-          $form_values['rid'][DRUPAL_AUTHENTICATED_RID]['grant_update'] : 0,
-        'grant_delete' => isset($form_values['rid'][DRUPAL_AUTHENTICATED_RID]['grant_delete']) ?
-          $form_values['rid'][DRUPAL_AUTHENTICATED_RID]['grant_delete'] : 0,
+        'grant_view' => isset($form_values['rid'][$authenticated_rid]['grant_view']) ?
+          $form_values['rid'][$authenticated_rid]['grant_view'] : 0,
+        'grant_update' => isset($form_values['rid'][$authenticated_rid]['grant_update']) ?
+          $form_values['rid'][$authenticated_rid]['grant_update'] : 0,
+        'grant_delete' => isset($form_values['rid'][$authenticated_rid]['grant_delete']) ?
+          $form_values['rid'][$authenticated_rid]['grant_delete'] : 0,
       );
     }
   }
@@ -298,7 +290,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
   if (is_array($roles)) {
     $form['rid'] = array('#tree' => TRUE);
     foreach ($roles as $key => $field) {
-//      $key = nodeaccess_get_role_name_from_machine($key);
+//      $key = nodeaccess_get_role_id_from_machine($key);
 
       if (isset($allowed_roles[$key]) && $allowed_roles[$key]) {
         $form['rid'][$key]['name'] = array(
@@ -640,7 +632,10 @@ function theme_nodeaccess_grants_form($vars) {
  * @return array
  */
 function nodeaccess_node_grants($account, $op) {
-  $roles = is_array($account->roles) ? array_keys($account->roles) : array(-1);
+  $roles = array();
+  foreach ($account->roles as $key => $role) {
+    $roles[] = nodeaccess_get_role_id_from_machine($role);
+  }
   return array(
     'nodeaccess_rid' => $roles,
     'nodeaccess_uid' => array($account->uid),
@@ -718,6 +713,9 @@ function nodeaccess_node_access_records($node) {
   $result = $query->execute();
   if (!$result->rowCount()) {
     // Node has no own grants, use defaults.
+    foreach ($default as $key => $role) {
+      $default[$key]['gid'] = $key;
+    }
     $grants = $default;
   }
   else {
@@ -785,7 +783,6 @@ function nodeaccess_node_type_delete($info) {
   $config->save();
 }
 
-
 /**
  * Implements hook_node_type_update().
  *
@@ -821,24 +818,26 @@ function nodeaccess_node_type_update($info) {
 function nodeaccess_node_type_insert($info) {
   // Load in our configurations
   $config = config('nodeaccess.settings');
+  $anonymous_rid = nodeaccess_get_role_id_from_machine(BACKDROP_ANONYMOUS_RID);
+  $authenticated_rid = nodeaccess_get_role_id_from_machine(BACKDROP_AUTHENTICATED_RID);
 
   // New node type, default to whatever is set for access content permission.
   $role_perms = user_role_permissions(array(1 => 1, 2 => 2));
-  $role_perms[DRUPAL_ANONYMOUS_RID]['access content'] = isset($role_perms[1]['access content']) ?
+  $role_perms[$anonymous_rid]['access content'] = isset($role_perms[1]['access content']) ?
                                       intval($role_perms[1]['access content']) : 0;
-  $role_perms[DRUPAL_AUTHENTICATED_RID]['access content'] = isset($role_perms[2]['access content']) ?
+  $role_perms[$authenticated_rid]['access content'] = isset($role_perms[2]['access content']) ?
                                       intval($role_perms[2]['access content']) : 0;
   $grants[] = array(
-    'gid' => DRUPAL_ANONYMOUS_RID,
+    'gid' => $anonymous_rid,
     'realm' => 'nodeaccess_rid',
-    'grant_view' => $role_perms[DRUPAL_ANONYMOUS_RID]['access content'],
+    'grant_view' => $role_perms[$anonymous_rid]['access content'],
     'grant_update' => 0,
     'grant_delete' => 0,
   );
   $grants[] = array(
-    'gid' => DRUPAL_AUTHENTICATED_RID,
+    'gid' => $authenticated_rid,
     'realm' => 'nodeaccess_rid',
-    'grant_view' => $role_perms[DRUPAL_AUTHENTICATED_RID]['access content'],
+    'grant_view' => $role_perms[$authenticated_rid]['access content'],
     'grant_update' => 0,
     'grant_delete' => 0,
   );
@@ -932,7 +931,7 @@ function nodeaccess_get_grants($node) {
   // Load grants by roles.
   $roles = user_roles();
   foreach ($roles as $machine => $name) {
-    $key = nodeaccess_get_role_name_from_machine($machine);
+    $key = nodeaccess_get_role_id_from_machine($machine);
     $query = db_select('nodeaccess', 'na');
     // AND na.realm = :realm AND na.nid = :nid', array(':realm' => 'nodeaccess_rid', ':nid' => $node->nid));
     $query->fields('na', array('grant_view', 'grant_update', 'grant_delete'));
@@ -941,14 +940,25 @@ function nodeaccess_get_grants($node) {
     $query->condition('na.gid', $key, '=');
     $result = $query->execute();
     $grant = $result->fetchObject();
-    $grants['rid'][$key] = array(
-      'name' => empty($name) ? '' : check_plain($name),
-      'grant_view' => (bool) $grant->grant_view,
-      'grant_update' => (bool) $grant->grant_update,
-      'grant_delete' => (bool) $grant->grant_delete,
-    );
+    if (!empty($grant)) {
+      $grants['rid'][$key] = array(
+        'name' => empty($name) ? '' : check_plain($name),
+        'grant_view' => (bool) $grant->grant_view,
+        'grant_update' => (bool) $grant->grant_update,
+        'grant_delete' => (bool) $grant->grant_delete,
+      );
+    }
+    else {
+      $grant = nodeaccess_get_default_grants($node->type, $key);
+      $grants['rid'][$key] = array(
+        'name' => empty($name) ? '' : check_plain($name),
+        'grant_view' => (bool) $grant->grant_view,
+        'grant_update' => (bool) $grant->grant_update,
+        'grant_delete' => (bool) $grant->grant_delete,
+      );     
+    }
   }
-  
+
   // Load grants by users
   $query = db_select('node_access', 'na');
   $query->join('users', 'u', 'u.uid = na.gid');
@@ -993,7 +1003,6 @@ function nodeaccess_set_grants($node, $grants = array()) {
     }
   }
   node_access_acquire_grants($node);
-  node_access_rebuild(FALSE);
 }
 
 
@@ -1009,6 +1018,7 @@ function nodeaccess_delete_grants($node) {
       ->condition('nid', $node->nid)
       ->execute();
 
+    
     node_access_acquire_grants($node);
   }
   catch (Exception $e) {
@@ -1115,17 +1125,42 @@ function nodeaccess_set_type_grants($types = array()) {
 /**
  * Get the role name from our machine name used by backdrop and 
  * mapped when we install our module or add a new role.
+ * 
+ * @param string $machine
+ *   The machine name for which we need to procure the nodeaccess
+ *   role id.
+ * 
+ * @return int $rid
+ *   The id associated with the role. Returns FALSE if none exist.
  */
-function nodeaccess_get_role_name_from_machine($machine) {
+function nodeaccess_get_role_id_from_machine($machine) {
   $config = config('nodeaccess.settings');
-  
-  // Update our node type grants.
   $map = $config->get('role_map');
- 
   foreach ($map as $key => $definition) {
     if ($definition['name'] == $machine) {
       return $key;
     }
   }
   return FALSE;
+}
+
+/**
+ * Get the default grants for the specified node type and return it in
+ * an assignable way
+ * 
+ * @param string $type
+ *   The machine name of the node type we need grants for.
+ * 
+ * @param int $key
+ *   The grant id that you want to get the default permissions.
+ * 
+ * @return object $grants
+ *   An object containing the default grant permissions.
+ * 
+ */
+function nodeaccess_get_default_grants($type, $key) {
+  $config = config('nodeaccess.settings');
+  // Get the default grants for this node.
+  $map = $config->get('nodeaccess_' . $type);
+  return (object) $map[$key];
 }
