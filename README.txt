@@ -1,19 +1,21 @@
-Node Access Module
+NodeAccess Module
 
-This module allows you to manage permissions for nodes by role and user. In other words,
+A node is a piece of content stored by Backdrop in a specific content type. It is a legacy
+term associated with Drupal content but is synonymous with Backdrop content.
+
+This module allows you to manage permissions for nodes/content by role and user. In other words,
 it implements per node access control for users and groups. With this module, you can
-restrict access to any individual node without having to use taxonomy. You can assign 
-permission to view, edit or delete each individual node by user or role. Once enabled,
-a 'grant' tab will appear on node edit pages. You can click this and assign permissions for 
-that node.
+restrict access to any individual node without having to use taxonomies. You can assign 
+permission to view, edit or delete each individual piece of content by user or role. Once enabled,
+a 'grant' tab will appear on edit pages for each piece of content. You can click this and assign 
+permissions for that node/piece of content..
 
 
 INSTALLATION:
 
 Put the module in your Backdrop modules directory and enable it in admin/modules.
 
-I would strongly recommend backing up your database before installing
-this module...
+I would strongly recommend backing up your database before installing this module...
 
 IMPORTANT!
 
@@ -38,7 +40,7 @@ if the grant tab should be available on that page. If the show grant tab option 
 not checked, the grant tab will not appear on the node page regardless of user permissions.
 
 For each node type, you can also choose the default permissions for that type. To emulate 
-standard drupal permissions, you would give anonymous user and authenticated user view permissions
+standard Backdrop permissions, you would give anonymous user and authenticated user view permissions
 for each node type. Note that once this module is first enabled, no permissions are granted, so
 it is important to set defaults.
 
@@ -51,7 +53,6 @@ TIPS:
 
 If you grant authenticated users edit permission, you cannot revoke that for any user
 who is a member of authenticated users. For example, if you wanted all users to be able
-to edit a node except for one user, you cannot do this by granted edit permission to 
-authenticated users, then adding the user to the node without view permissions. Drupal
+to edit a node except for one user, you cannot do this by granting edit permission to 
+authenticated users, then adding the user to the node without view permissions. Backdrop
 doesn't let you do that.
-

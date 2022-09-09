@@ -2,26 +2,8 @@
 
 /**
  * @file
- * Provide per node access control
+ * Provide per node/content type access control
  */
-
-/**
- * Implements hook_help().
- *
- * @param string $path
- * @param $arg
- *
- * @return string|NULL
- */
-function nodeaccess_help($path, $arg) {
-  switch ($path) {
-    case 'node/%/grant':
-      return t("You can set grants for individual users. Enter a name or a
-        partial name in the box and click Search or press return. You must check
-        the 'Keep?' checkbox if you want to keep the user for granting. Note
-        that user grants are in addition to those coming from roles.");
-  }
-}
 
 /**
  * Implements hook_config_info().
@@ -116,7 +98,7 @@ function nodeaccess_permission() {
  * @return string
  */
 function nodeaccess_node_access($node, $op, $account) {
-  $anonymous_rid = nodeaccess_get_role_id_from_machine(DRUPAL_ANONYMOUS_RID);
+  $anonymous_rid = nodeaccess_get_role_id_from_machine(BACKDROP_ANONYMOUS_ROLE);
   switch ($op) {
     case 'update':
     case 'delete':
@@ -179,10 +161,8 @@ function nodeaccess_access($op, $node, $account = NULL) {
       return TRUE;
     }
   }
-
   return FALSE;
 }
-
 
 /**
  * Implements hook_theme().
@@ -196,9 +176,6 @@ function nodeaccess_access($op, $node, $account = NULL) {
  */
 function nodeaccess_theme($existing, $type, $theme, $path) {
   return array(
-    'nodeaccess_admin_form_roles' => array(
-      'render element'  => 'form',
-    ),
     'nodeaccess_admin_form_types' => array(
       'render element'  => 'form',
     ),
@@ -241,7 +218,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
       $query->condition('uid', $uid, 'NOT IN');
     }
 
-    $authenticated_rid = nodeaccess_get_role_id_from_machine(DRUPAL_AUTHENTICATED_RID);
+    $authenticated_rid = nodeaccess_get_role_id_from_machine(BACKDROP_AUTHENTICATED_ROLE);
 
 
     $result = $query->execute();
@@ -704,7 +681,7 @@ function nodeaccess_node_access_records($node) {
     'grant_view' => 0,
     'grant_update' => 0,
     'grant_delete' => 0,
-    'priority' => variable_get('nodeaccess-priority', 0),
+    'priority' => $config->get('priority'),
   );
 
   $query = db_select('nodeaccess', 'n')
@@ -776,10 +753,13 @@ function nodeaccess_node_type_delete($info) {
   $config = config('nodeaccess.settings');
 
   // Node type is being deleted, delete its preferences.
-  $config->get('nodeaccess_' . $info->type);
-  $author_prefs = variable_get('nodeaccess_authors', array());
-  unset($author_prefs[$info->type]);
-  $config->set('nodeaccess_authors', $author_prefs);
+  $authors = $config->get('authors');
+  $types = $config->get('types');
+  $config->clear('nodeaccess_' . $info->type);
+  unset($authors[$info->type]);
+  unset($types[$info->type]);
+  $config->set('authors', $authors);
+  $config->set('types', $types);
   $config->save();
 }
 
@@ -809,7 +789,6 @@ function nodeaccess_node_type_update($info) {
   }
 }
 
-
 /**
  * Implements hook_node_type_insert().
  *
@@ -818,15 +797,21 @@ function nodeaccess_node_type_update($info) {
 function nodeaccess_node_type_insert($info) {
   // Load in our configurations
   $config = config('nodeaccess.settings');
-  $anonymous_rid = nodeaccess_get_role_id_from_machine(BACKDROP_ANONYMOUS_RID);
-  $authenticated_rid = nodeaccess_get_role_id_from_machine(BACKDROP_AUTHENTICATED_RID);
+  $anonymous_rid = nodeaccess_get_role_id_from_machine(BACKDROP_ANONYMOUS_ROLE);
+  $authenticated_rid = nodeaccess_get_role_id_from_machine(BACKDROP_AUTHENTICATED_ROLE);
+  $role_perms = array();
+
+  $roles = array(
+    $anonymous_rid => BACKDROP_ANONYMOUS_ROLE,
+    $authenticated_rid => BACKDROP_AUTHENTICATED_ROLE,
+  );
 
   // New node type, default to whatever is set for access content permission.
-  $role_perms = user_role_permissions(array(1 => 1, 2 => 2));
-  $role_perms[$anonymous_rid]['access content'] = isset($role_perms[1]['access content']) ?
-                                      intval($role_perms[1]['access content']) : 0;
-  $role_perms[$authenticated_rid]['access content'] = isset($role_perms[2]['access content']) ?
-                                      intval($role_perms[2]['access content']) : 0;
+  foreach ($roles as $rid => $machine) {
+    $permissions = user_role_permissions(array($machine));
+    $role_perms[$rid]['access content'] = in_array('access content', $permissions);
+  }
+
   $grants[] = array(
     'gid' => $anonymous_rid,
     'realm' => 'nodeaccess_rid',
@@ -844,14 +829,13 @@ function nodeaccess_node_type_insert($info) {
   $config->set('nodeaccess_' . $info->type, $grants);
 
   // Add permissions for author.
-  $author_prefs = variable_get('nodeaccess_authors', array());
+  $author_prefs = $config->get('authors');
   $author_prefs[$info->type] = array(
     'grant_view' => 0,
     'grant_update' => 0,
     'grant_delete' => 0,
   );
-
-  $config->set('nodeaccess_authors', $author_prefs);
+  $config->set('authors', $author_prefs);
   $config->save();
   node_access_needs_rebuild(TRUE);
 }
@@ -1005,7 +989,6 @@ function nodeaccess_set_grants($node, $grants = array()) {
   node_access_acquire_grants($node);
 }
 
-
 /**
  * Delete all grants from nodeaccess table for this node.
  *
@@ -1017,15 +1000,12 @@ function nodeaccess_delete_grants($node) {
     db_delete('nodeaccess')
       ->condition('nid', $node->nid)
       ->execute();
-
-    
     node_access_acquire_grants($node);
   }
   catch (Exception $e) {
     backdrop_set_message(t("Database error has occurred while clearing nodeaccess table."), 'error');
     watchdog('nodeaccess', 'Database error: @message.', array('@message' => $e->getMessage()), WATCHDOG_ERROR);
   }
-  
 }
 
 /**
@@ -1081,7 +1061,7 @@ function nodeaccess_save_grant($node, $grant) {
  *   The node type we are adding the grant tab for.
  */
 function nodeaccess_add_type_grant($type) {
-  $grants = variable_get('nodeaccess-types', array());
+  $grants = $config->get('nodeaccess-types', array());
   $grants[$type] = TRUE;
 
   nodeaccess_set_type_grants($grants);
@@ -1094,8 +1074,9 @@ function nodeaccess_add_type_grant($type) {
  *   The node type we are removing the grant tab from.
  */
 function nodeaccess_delete_type_grant($type) {
-  $grants = variable_get('nodeaccess-types', array());
-
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
+  $grants = $config->get('types');
   if (isset($grants[$type])) {
     unset($grants[$type]);
   }
@@ -1107,7 +1088,6 @@ function nodeaccess_delete_type_grant($type) {
  *
  * @param array $types
  *   The types that will have the grant tab appear.
- *
  */
 function nodeaccess_set_type_grants($types = array()) {
   if (!is_array($types)) {

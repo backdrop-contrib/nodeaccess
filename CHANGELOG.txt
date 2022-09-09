@@ -1,6 +1,7 @@
 Nodeaccess 1.x
 ==============
 Ported to Backdrop CMS
+Update hook to convert Drupal variables to Backdrop configurations.
 
 
 Nodeaccess 7.x-1.7

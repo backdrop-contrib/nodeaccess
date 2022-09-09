@@ -1,5 +1,5 @@
 name = Nodeaccess
-description = Provides per node access control
+description = Provides per node/content type access control
 backdrop = 1.x
 type = module
 

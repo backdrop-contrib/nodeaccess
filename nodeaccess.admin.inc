@@ -115,11 +115,6 @@ function nodeaccess_admin_form($form, $form_state) {
       '#title' => check_plain($role->name),
       '#default_value' => isset($allowed_roles[$id]) ? $allowed_roles[$id] : 0,
     );
-    $form['role'][$id]['weight'] = array(
-      '#type' => 'weight',
-      '#default_value' => $role->weight,
-      '#delta' => 10,
-    );
   }
 
   // Grant tab to node types.
@@ -322,47 +317,6 @@ function nodeaccess_admin_form_submit($form, $form_state) {
   nodeaccess_set_type_grants($allowed_types);
   backdrop_set_message(t('Grants saved.'));
 }
-
-/**
- * Theme function for nodeaccess_admin_form_roles.
- *
- * @param $variables
- * @throws Exception
- * @return string
- */
-function theme_nodeaccess_admin_form_roles($variables) {
-  $output = '';
-  $form = $variables['form'];
-  $rows = array();
-  foreach (element_children($form) as $rid) {
-    // Classify the weight element for TableDrag.
-    $form[$rid]['weight']['#attributes']['class'] = array('roles-order-weight');
-
-    // Mark the table row as draggable for TableDrag.
-    $row = array(
-      'data' => array(),
-      'class' => array('draggable'),
-    );
-    // Render the table columns.
-    $row['data'][] = backdrop_render($form[$rid]['allow']);
-    $row['data'][] = backdrop_render($form[$rid]['weight']);
-    $rows[] = $row;
-  }
-
-  $header = array(t('Allow Role'), t('Weight'));
-  $output .= theme('table', array(
-    'header' => $header,
-    'rows' => $rows,
-    'attributes' => array('id' => 'roles-order'),
-  ));
-  $output .= backdrop_render_children($form);
-
-  // Attach TableDrag to the table ID and contained weight elements.
-  backdrop_add_tabledrag('roles-order', 'order', 'sibling', 'roles-order-weight');
-
-  return $output;
-}
-
 
 /**
  * Theme function to render admin form.

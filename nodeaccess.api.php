@@ -5,7 +5,6 @@
  * API documentation for Nodeaccess module.
  */
 
-
 /**
  * Allow for changes to be made on the entire grants array for a node before
  * saving.
