@@ -170,12 +170,8 @@ function nodeaccess_admin_form($form, $form_state) {
       '#default_value' => $author_prefs[$type]['grant_delete'],
     );
 
-    $perms = $config->get('nodeaccess_' . $type);
-    foreach ($perms as $perm) {
-      $opts[$perm['gid']] = $perm;
-    }
-
     // Set default role permissions for node type.
+    $opts = $config->get('nodeaccess_' . $type);
     $user_roles = user_roles();
     foreach ($user_roles as $id => $role) {
       $form['nodeaccess'][$type]['roles'][$id]['name'] = array('#markup' => $role);
@@ -280,14 +276,16 @@ function nodeaccess_admin_form_submit($form, $form_state) {
   foreach ($node_types as $type => $name) {
     $grants = array();
     foreach ($form_values[$type]['roles'] as $role => $val) {
-      $grants[] = array(
-        'gid' => $role,
+      $gid = nodeaccess_get_role_id_from_machine($role);
+      $grants[$role] = array(
+        'gid' => $gid,
         'realm' => 'nodeaccess_rid',
         'grant_view' => $val['grant_view'],
         'grant_update' => $val['grant_update'],
         'grant_delete' => $val['grant_delete'],
       );
     }
+
     $config->set('nodeaccess_' . $type, $grants);
     $author_prefs[$type] = $form_values[$type]['author'];
     // Also save userreference default permissions if enabled.

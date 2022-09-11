@@ -57,7 +57,6 @@ function nodeaccess_admin_paths() {
     'node/*/grant' => TRUE,
     'admin/config/people/nodeaccess' => TRUE,
   );
-
   return $paths;
 }
 
@@ -67,7 +66,6 @@ function nodeaccess_admin_paths() {
  * @return array
  */
 function nodeaccess_permission() {
-
   return array(
     'administer nodeaccess' => array(
       'title' => t('Administer Nodeaccess'),
@@ -208,7 +206,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
   }
   elseif ($form_values['keys']) {
     $name = preg_replace('!\*+!', '%', $form_values['keys']);
-
+    
     $query = db_select('users', 'u')
       ->fields('u', array('uid', 'name'))
       ->condition('name', $name, "LIKE");
@@ -219,7 +217,6 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
     }
 
     $authenticated_rid = nodeaccess_get_role_id_from_machine(BACKDROP_AUTHENTICATED_ROLE);
-
 
     $result = $query->execute();
     while ($account = $result->fetch()) {
@@ -267,7 +264,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
   if (is_array($roles)) {
     $form['rid'] = array('#tree' => TRUE);
     foreach ($roles as $key => $field) {
-//      $key = nodeaccess_get_role_id_from_machine($key);
+      // $key = nodeaccess_get_role_id_from_machine($key);
 
       if (isset($allowed_roles[$key]) && $allowed_roles[$key]) {
         $form['rid'][$key]['name'] = array(
@@ -691,7 +688,8 @@ function nodeaccess_node_access_records($node) {
   if (!$result->rowCount()) {
     // Node has no own grants, use defaults.
     foreach ($default as $key => $role) {
-      $default[$key]['gid'] = $key;
+      $gid = nodeaccess_get_role_id_from_machine($key);
+      $default[$key]['gid'] = $gid;
     }
     $grants = $default;
   }
@@ -806,7 +804,7 @@ function nodeaccess_node_type_insert($info) {
     $authenticated_rid => BACKDROP_AUTHENTICATED_ROLE,
   );
 
-  // New node type, default to whatever is set for access content permission.
+  // New node type, default to our default content type permissions.
   foreach ($roles as $rid => $machine) {
     $permissions = user_role_permissions(array($machine));
     $role_perms[$rid]['access content'] = in_array('access content', $permissions);
@@ -933,7 +931,7 @@ function nodeaccess_get_grants($node) {
       );
     }
     else {
-      $grant = nodeaccess_get_default_grants($node->type, $key);
+      $grant = nodeaccess_get_default_grants($node->type, $machine);
       $grants['rid'][$key] = array(
         'name' => empty($name) ? '' : check_plain($name),
         'grant_view' => (bool) $grant->grant_view,
@@ -1000,12 +998,22 @@ function nodeaccess_delete_grants($node) {
     db_delete('nodeaccess')
       ->condition('nid', $node->nid)
       ->execute();
-    node_access_acquire_grants($node);
   }
   catch (Exception $e) {
     backdrop_set_message(t("Database error has occurred while clearing nodeaccess table."), 'error');
     watchdog('nodeaccess', 'Database error: @message.', array('@message' => $e->getMessage()), WATCHDOG_ERROR);
   }
+  node_access_acquire_grants($node);
+
+  // Delete this specific node from the page cache, do not kill
+  // the whole cache. We need to clear the node id path and the alias
+  // so that we cover all the bases.
+  db_delete('cache_page')
+    ->condition('cid', '%' . db_like($node->path['alias']), 'LIKE')
+    ->execute();
+  db_delete('cache_page')
+    ->condition('cid', '%' . db_like($node->path['source']), 'LIKE')
+    ->execute();
 }
 
 /**

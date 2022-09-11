@@ -70,58 +70,6 @@ function nodeaccess_install() {
   $config = config('nodeaccess.settings');
   $roles = user_roles(FALSE, NULL, TRUE);
 
-  // Set up default permissions to be view for authenticated and
-  // anonymous users, and all permissions for author.
-  $grants = array();
-  $role_perms = user_role_permissions(array(1 => 1, 2 => 2));
-  $role_perms[1]['access content'] = isset($role_perms[1]['access content'])?
-                                      intval($role_perms[1]['access content']) : 0;
-  $role_perms[2]['access content'] = isset($role_perms[2]['access content'])?
-                                      intval($role_perms[2]['access content']) : 0;
-  // Anonymous user setting.
-  $grants[] = array(
-    'gid' => 1,
-    'realm' => 'nodeaccess_rid',
-    'grant_view' => $role_perms[1]['access content'],
-  );
-  // Authenticated user setting.
-  $grants[] = array(
-    'gid' => 2,
-    'realm' => 'nodeaccess_rid',
-    'grant_view' => $role_perms[2]['access content'],
-  );
-  $author_prefs = array();
-  $node_types = node_type_get_types();
-  foreach ($node_types as $type => $name) {
-    // We check the edit permissions for anonymous and authenticated users.
-    $edit_perm = 'edit any ' . $type . ' content';
-    $role_perms[1][$edit_perm] = isset($role_perms[1][$edit_perm])?
-                                      intval($role_perms[1][$edit_perm]) : 0;
-    $role_perms[2][$edit_perm] = isset($role_perms[2][$edit_perm])?
-                                      intval($role_perms[2][$edit_perm]) : 0;
-    $grants[0]['grant_update'] = $role_perms[1][$edit_perm];
-    $grants[1]['grant_update'] = $role_perms[2][$edit_perm];
-    // We check the delete permissions for anonymous and authenticated users.
-    $delete_perm = 'delete any ' . $type . ' content';
-    $role_perms[1][$delete_perm] = isset($role_perms[1][$delete_perm])?
-                                      intval($role_perms[1][$delete_perm]) : 0;
-    $role_perms[2][$delete_perm] = isset($role_perms[2][$delete_perm])?
-                                      intval($role_perms[2][$delete_perm]) : 0;
-    $grants[0]['grant_delete'] = $role_perms[1][$delete_perm];
-    $grants[1]['grant_delete'] = $role_perms[2][$delete_perm];
-    $config->set('nodeaccess_' . $type, $grants);
-    $author_prefs[$type] = array(
-      'grant_view' => 0,
-      'grant_update' => 0,
-      'grant_delete' => 0,
-    );
-  }
-  $config->set('authors', $author_prefs);
-
-  // Set up all permissions to be editable by default.
-  $grant_prefs = array('view' => 1, 'edit' => 1, 'delete' => 1);
-  $config->set('allowed_grants', $grant_prefs);
-
   /**
    * Set up an ID for our roles that way we can use them with our various node_access
    * grants (our nodeaccess ones too!). This becomes the gid for role based access
@@ -132,9 +80,173 @@ function nodeaccess_install() {
   foreach ($roles as $role_id => $role) {
     $roles_gids[$i] = new stdClass;
     $roles_gids[$i]->name = $role->name;
-    $roles_gids[$i]->weight = $role->weight;
     $i++;
   }
   $config->set('role_map', $roles_gids);
   $config->save();
+
+  $anonymous_rid = nodeaccess_get_role_id_from_machine(BACKDROP_ANONYMOUS_ROLE);
+  $authenticated_rid = nodeaccess_get_role_id_from_machine(BACKDROP_AUTHENTICATED_ROLE);
+  $role_perms = array();
+
+  // $roles = array(
+  //   $anonymous_rid => BACKDROP_ANONYMOUS_ROLE,
+  //   $authenticated_rid => BACKDROP_AUTHENTICATED_ROLE,
+  // );
+
+  $author_prefs = array();
+  $node_types = node_type_get_types();
+
+  foreach ($node_types as $type => $name) {
+    $grants = array();
+    $rid = 0;
+    foreach ($roles as $machine => $roleobject) {
+      $permissions = user_role_permissions(array($machine));
+      $anonymous_permissions = user_role_permissions(array('anonymous'));
+
+      $access_perm = 'access content';
+      if (in_array($access_perm, $anonymous_permissions)) {
+        $role_perms[$rid][$access_perm] = 1;
+      }
+      else {
+        $role_perms[$rid][$access_perm] = in_array($access_perm, $permissions);
+      }
+
+      $edit_perm = 'edit any ' . $type . ' content';
+      if ($role_perms[$anonymous_rid][$edit_perm] = in_array($edit_perm, $permissions)) {
+        $role_perms[$rid][$edit_perm] = 1;
+      }
+      else {
+        $role_perms[$rid][$edit_perm] = in_array($edit_perm, $permissions);
+      }
+
+      $delete_perm = 'delete any ' . $type . ' content';
+      if ($role_perms[$anonymous_rid][$delete_perm] = in_array($delete_perm, $permissions)) {
+        $role_perms[$rid][$delete_perm] = 1;
+      }
+      else {
+        $role_perms[$rid][$delete_perm] = in_array($delete_perm, $permissions);
+      }
+      
+      $grants[$machine] = array(
+        'gid' => $rid,
+        'realm' => 'nodeaccess_rid',
+        'grant_view' => $role_perms[$rid][$access_perm],
+        'grant_update' => $role_perms[$rid][$edit_perm],
+        'grant_delete' => $role_perms[$rid][$delete_perm],
+      );
+      $author_prefs[$type] = array(
+        'grant_view' => 1,
+        'grant_update' => 0,
+        'grant_delete' => 0,
+      );
+
+      $rid++;
+    }
+    $config->set('nodeaccess_' . $type, $grants);
+    $config->set('authors', $author_prefs);
+  }
+
+  // Set up all grant types to be enabled by default.
+  $grant_prefs = array('view' => 1, 'edit' => 1, 'delete' => 1);
+  $config->set('allowed_grants', $grant_prefs);
+
+  $config->save();
+
+  // Check to see if we are doing a migration.
+  nodeaccess_update_7106();
+}
+
+/**
+ * Convert our Nodeaccess Drupal 7 configurations to Backdrop
+ */
+function nodeaccess_update_7106() {
+  /**
+   * Only do this if nodeaccess_help exists. That is a function in the Drupal
+   * 7 version that is not in the Backdrop version. Tells us if we're doing a
+   * migration or not.
+   * 
+   * If we are doing a full on D7 -> Backdrop migration the nodeaccess and
+   * node_access tables should be the same and already map. The only problem
+   * are the grant ids due to differences between D7 and Backdrop in terms of
+   * role identifiers. So we will need to rebuild our access tables once we're
+   * done.
+   */
+  if (function_exists('nodeaccess_help')) {
+    $config = config('nodeaccess.settings');
+    $config->set('priority', variable_get('nodeaccess-priority', 0));
+    $config->set('preserve', variable_get('nodeaccess-preserve', 0));
+    $config->set('allowed_grants', variable_get('nodeaccess-grants', array()));
+    $config->set('allowed_types', variable_get('nodeaccess-types', array()));
+    $config->set('authors', variable_get('nodeaccess_authors', array()));
+    variable_del('nodeaccess-priority');
+    variable_del('nodeaccess-preserve');
+    variable_del('nodeaccess-grants');
+    variable_del('nodeaccess-roles');
+    variable_del('nodeaccess-types');
+    variable_del('nodeaccess_authors');
+
+// Array
+// (
+//     [0] => Array
+//         (
+//             [gid] => anonymous
+//             [realm] => nodeaccess_rid
+//             [grant_view] => 0
+//             [grant_update] => 0
+//             [grant_delete] => 0
+//         )
+
+//     [1] => Array
+//         (
+//             [gid] => authenticated
+//             [realm] => nodeaccess_rid
+//             [grant_view] => 1
+//             [grant_update] => 0
+//             [grant_delete] => 0
+//         )
+
+//     [2] => Array
+//         (
+//             [gid] => editor
+//             [realm] => nodeaccess_rid
+//             [grant_view] => 0
+//             [grant_update] => 0
+//             [grant_delete] => 0
+//         )
+
+//     [3] => Array
+//         (
+//             [gid] => administrator
+//             [realm] => nodeaccess_rid
+//             [grant_view] => 0
+//             [grant_update] => 0
+//             [grant_delete] => 0
+//         )
+
+//     [4] => Array
+//         (
+//             [gid] => new_shit
+//             [realm] => nodeaccess_rid
+//             [grant_view] => 0
+//             [grant_update] => 0
+//             [grant_delete] => 0
+//         )
+
+// )
+
+
+
+    foreach (node_type_get_types() as $type => $name) {
+      $nprefs = variable_get('nodeaccess_' . $type, array());
+      $uprefs = variable_get('nodeaccess_' . $type . '_userreference', array());
+      $config->set('nodeaccess_' . $type, $nprefs);
+      $config->set('nodeaccess_' . $type . '_userreference', array());
+      variable_del('nodeaccess_' . $type);
+      variable_del('nodeaccess_' . $type . '_userreference');
+    }
+
+    $config->save();
+    node_access_needs_rebuild(TRUE);
+  }
 }
