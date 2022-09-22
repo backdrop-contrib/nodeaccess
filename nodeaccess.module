@@ -711,10 +711,8 @@ function nodeaccess_node_access_records($node) {
     // Merge missing default grant keys.
     $grants[$id] = $grants[$id] + $grant_defaults;
   }
-
   return $grants;
 }
-
 
 /**
  * Mark module to be in process of disabling.
@@ -732,7 +730,6 @@ function nodeaccess_disabling($set = NULL) {
   if ($set !== NULL) {
     $disabling = $set;
   }
-
   return $disabling;
 }
 
@@ -1066,7 +1063,6 @@ function nodeaccess_save_grant($node, $grant) {
 function nodeaccess_add_type_grant($type) {
   $grants = $config->get('nodeaccess-types', array());
   $grants[$type] = TRUE;
-
   nodeaccess_set_type_grants($grants);
 }
 
@@ -1101,7 +1097,6 @@ function nodeaccess_set_type_grants($types = array()) {
   // Update our node type grants.
   $config->set('types', $types);
   $config->save();
-
   node_access_needs_rebuild(TRUE);
 }
 

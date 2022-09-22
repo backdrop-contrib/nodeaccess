@@ -89,11 +89,6 @@ function nodeaccess_install() {
   $authenticated_rid = nodeaccess_get_role_id_from_machine(BACKDROP_AUTHENTICATED_ROLE);
   $role_perms = array();
 
-  // $roles = array(
-  //   $anonymous_rid => BACKDROP_ANONYMOUS_ROLE,
-  //   $authenticated_rid => BACKDROP_AUTHENTICATED_ROLE,
-  // );
-
   $author_prefs = array();
   $node_types = node_type_get_types();
 
@@ -185,57 +180,6 @@ function nodeaccess_update_7106() {
     variable_del('nodeaccess-roles');
     variable_del('nodeaccess-types');
     variable_del('nodeaccess_authors');
-
-// Array
-// (
-//     [0] => Array
-//         (
-//             [gid] => anonymous
-//             [realm] => nodeaccess_rid
-//             [grant_view] => 0
-//             [grant_update] => 0
-//             [grant_delete] => 0
-//         )
-
-//     [1] => Array
-//         (
-//             [gid] => authenticated
-//             [realm] => nodeaccess_rid
-//             [grant_view] => 1
-//             [grant_update] => 0
-//             [grant_delete] => 0
-//         )
-
-//     [2] => Array
-//         (
-//             [gid] => editor
-//             [realm] => nodeaccess_rid
-//             [grant_view] => 0
-//             [grant_update] => 0
-//             [grant_delete] => 0
-//         )
-
-//     [3] => Array
-//         (
-//             [gid] => administrator
-//             [realm] => nodeaccess_rid
-//             [grant_view] => 0
-//             [grant_update] => 0
-//             [grant_delete] => 0
-//         )
-
-//     [4] => Array
-//         (
-//             [gid] => new_shit
-//             [realm] => nodeaccess_rid
-//             [grant_view] => 0
-//             [grant_update] => 0
-//             [grant_delete] => 0
-//         )
-
-// )
-
-
 
     foreach (node_type_get_types() as $type => $name) {
       $nprefs = variable_get('nodeaccess_' . $type, array());
