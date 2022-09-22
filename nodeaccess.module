@@ -42,10 +42,8 @@ function nodeaccess_menu() {
     'weight' => 5,
     'type' => MENU_LOCAL_TASK,
   );
-
   return $items;
 }
-
 
 /**
  * Implements hook_admin_paths().
@@ -85,7 +83,6 @@ function nodeaccess_permission() {
   );
 }
 
-
 /**
  * Implements hook_node_access().
  *
@@ -114,7 +111,9 @@ function nodeaccess_node_access($node, $op, $account) {
           return NODE_ACCESS_ALLOW;
         }
         return NODE_ACCESS_DENY;
-      }
+    }
+    break;
+    default:
       break;
   }
 }
@@ -137,12 +136,6 @@ function nodeaccess_access($op, $node, $account = NULL) {
   if (empty($node)) {
     return FALSE;
   }
-
-  // // Apparently D7 no longer defaults to admin getting anything?
-  // if (user_access('administer nodeaccess')) {
-
-  //   return TRUE;
-  // }
 
   // If no user object is supplied, the access check is for the current user.
   if (empty($account)) {
@@ -236,7 +229,6 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
   if (!isset($form_values['rid'])) {
     $form_values['rid'] = array();
   }
-
   if (!isset($form_values['uid'])) {
     $form_values['uid'] = array();
   }
@@ -266,7 +258,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
     foreach ($roles as $key => $field) {
       // $key = nodeaccess_get_role_id_from_machine($key);
 
-      if (isset($allowed_roles[$key]) && $allowed_roles[$key]) {
+      if (!empty($allowed_roles[$key])) {
         $form['rid'][$key]['name'] = array(
           '#type' => 'hidden',
           '#value' => $field['name'],
@@ -280,7 +272,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
         elseif ($preserve) {
           $form['rid'][$key]['grant_view'] = array(
             '#type' => 'hidden',
-            '#value' => $field['grant_view'],
+            '#value' => (int) $field['grant_view'],
           );
         }
         if ($allowed_grants['edit']) {
@@ -289,10 +281,10 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
             '#default_value' => $field['grant_update'],
           );
         }
-        elseif ($preserve) {
+        elseif (!empty($preserve)) {
           $form['rid'][$key]['grant_update'] = array(
             '#type' => 'hidden',
-            '#value' => $field['grant_update'],
+            '#value' => (int) $field['grant_update'],
           );
         }
         if ($allowed_grants['delete']) {
@@ -304,30 +296,31 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
         elseif ($preserve) {
           $form['rid'][$key]['grant_delete'] = array(
             '#type' => 'hidden',
-            '#value' => $field['grant_delete'],
+            '#value' => (int) $field['grant_delete'],
           );
         }
       }
       elseif ($preserve) {
         $form['rid'][$key]['name'] = array(
           '#type' => 'hidden',
-          '#value' => $field['name'],
+          '#value' => (int) $field['name'],
         );
         $form['rid'][$key]['grant_view'] = array(
           '#type' => 'hidden',
-          '#value' => $field['grant_view'],
+          '#value' => (int) $field['grant_view'],
         );
         $form['rid'][$key]['grant_update'] = array(
           '#type' => 'hidden',
-          '#value' => $field['grant_update'],
+          '#value' => (int) $field['grant_update'],
         );
         $form['rid'][$key]['grant_delete'] = array(
           '#type' => 'hidden',
-          '#value' => $field['grant_delete'],
+          '#value' => (int) $field['grant_delete'],
         );
       }
     }
   }
+
   // Users table.
   if (is_array($users)) {
     $form['uid'] = array('#tree' => TRUE);
@@ -349,7 +342,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
       elseif ($preserve) {
         $form['uid'][$key]['grant_view'] = array(
           '#type' => 'hidden',
-          '#value' => $field['grant_view'],
+          '#value' => (int) $field['grant_view'],
         );
       }
       if ($allowed_grants['edit']) {
@@ -361,7 +354,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
       elseif ($preserve) {
         $form['uid'][$key]['grant_update'] = array(
           '#type' => 'hidden',
-          '#value' => $field['grant_update'],
+          '#value' => (int) $field['grant_update'],
         );
       }
       if ($allowed_grants['delete']) {
@@ -373,7 +366,7 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
       elseif ($preserve) {
         $form['uid'][$key]['grant_delete'] = array(
           '#type' => 'hidden',
-          '#value' => $field['grant_delete'],
+          '#value' => (int) $field['grant_delete'],
         );
       }
     }
@@ -400,7 +393,6 @@ function nodeaccess_grants_form($form, &$form_state, $node) {
     '#type' => 'submit',
     '#value' => t('Search'),
   );
-
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save Grants'),
@@ -451,7 +443,6 @@ function nodeaccess_grants_form_submit($form, &$form_state) {
     backdrop_set_message(t('Grants saved.'));
   }
 }
-
 
 /**
  * Private function to submit the per-node grants table.
@@ -516,30 +507,25 @@ function theme_nodeaccess_grants_form($vars) {
     if ($allowed_grants['view']) {
       $header[] = t('View');
     }
-
     if ($allowed_grants['edit']) {
       $header[] = t('Edit');
     }
-
     if ($allowed_grants['delete']) {
       $header[] = t('Delete');
     }
 
     foreach ($roles as $key => $role) {
-      if (isset($allowed_roles[$key]) && $allowed_roles[$key]) {
+      if (!empty($allowed_roles[$role])) {
         $row = array();
-        $row[] = $role_map[$key]['name'] . backdrop_render($form['rid'][$key]['name']);
-
+        $row[] = $role_map[$role]['name'] . backdrop_render($form['rid'][$role]['name']);
         if ($allowed_grants['view']) {
-          $row[] = backdrop_render($form['rid'][$key]['grant_view']);
+          $row[] = backdrop_render($form['rid'][$role]['grant_view']);
         }
-
         if ($allowed_grants['edit']) {
-          $row[] = backdrop_render($form['rid'][$key]['grant_update']);
+          $row[] = backdrop_render($form['rid'][$role]['grant_update']);
         }
-
         if ($allowed_grants['delete']) {
-          $row[] = backdrop_render($form['rid'][$key]['grant_delete']);
+          $row[] = backdrop_render($form['rid'][$role]['grant_delete']);
         }
         $rows[] = $row;
       }
@@ -547,9 +533,13 @@ function theme_nodeaccess_grants_form($vars) {
     $output .= theme('table', array('header' => $header, 'rows' => $rows));
   }
 
+  // Change search button to "add user" to clarify what the button does.
+  $form['search']['#value'] = t('Add User');
+
   // Search form.
   $output .= '<p><div class="search-form">';
-  $output .= '<strong>' . t('Enter names to search for users:') . '</strong>';
+  $output .= '<strong>' . t('User specific grants. Enter names to search for users:') . '</strong><br />';
+  $output .= t('If a user has no grants, they will be removed from the table below. This is because denies are implicit. You cannot deny access to a user if their role has access. Neither Backdrop or Drupal work that way.');
   $output .= '<div class="container-inline">';
   $output .= backdrop_render($form['keys']);
   $output .= backdrop_render($form['search']);
@@ -588,6 +578,11 @@ function theme_nodeaccess_grants_form($vars) {
       }
       $rows[] = $row;
     }
+    $output .= theme('table', array('header' => $header, 'rows' => $rows));
+  }
+  else {
+    $header = array(t('There are no user specific grants for this node.'));
+    $rows = array();
     $output .= theme('table', array('header' => $header, 'rows' => $rows));
   }
 
