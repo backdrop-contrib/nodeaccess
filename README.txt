@@ -1,58 +1,55 @@
 NodeAccess Module
+=================
 
-A node is a piece of content stored by Backdrop in a specific content type. It is a legacy
-term associated with Drupal content but is synonymous with Backdrop content.
+This module allows you to manage permissions for nodes/content by role
+and user. In other words, it implements per node access control for users and
+groups. With this module, you can restrict access to any individual node 
+without having to use taxonomies. You can assign permission to view, edit or
+delete each individual piece of content by user or role. Once enabled, a 
+'grant' tab will appear on edit pages for each piece of content. You can click 
+this and assign permissions for that node/piece of content.
 
-This module allows you to manage permissions for nodes/content by role and user. In other words,
-it implements per node access control for users and groups. With this module, you can
-restrict access to any individual node without having to use taxonomies. You can assign 
-permission to view, edit or delete each individual piece of content by user or role. Once enabled,
-a 'grant' tab will appear on edit pages for each piece of content. You can click this and assign 
-permissions for that node/piece of content..
+Installation
+------------
 
+Put the module in your Backdrop modules directory and enable it in
+admin/modules.
 
-INSTALLATION:
-
-Put the module in your Backdrop modules directory and enable it in admin/modules.
-
-I would strongly recommend backing up your database before installing this module...
+I would strongly recommend backing up your database before installing this
+module.
 
 IMPORTANT!
 
-Once you check the enable box and submit the page, no nodes will be accessible to anyone
-other than the admin user. You just set permissions on the nodeaccess settings page 
-(admin/settings/nodeaccess) to enable access to your site.
+Once you check the enable box and submit the page, no nodes will be accessible
+to anyone other than the admin user. You just set permissions on the nodeaccess
+settings page (admin/settings/nodeaccess) to enable access to your site.
 
-The settings page has a section for roles, and then a section for every node type you 
-have on your site.
+The settings page has a section for roles, and then a section for every node 
+type you have on your site.
 
-ALLOWED ROLES:
+Documentation
+------------
 
-The allowed roles section allows you to choose what roles will appear on the node grant
-tab. Just check each role you want to appear. Note that you can still set defaults for
-all roles as the admin user, these options just hide what is available on each node
-page.
+Additional documentation is located in [the Wiki](https://github.com/backdrop-contrib/nodeaccess/wiki/Documentation).
 
-NODE TYPE SETTINGS:
+Issues
+------
 
-For each node type on your site, you can set default role access permissions and choose
-if the grant tab should be available on that page. If the show grant tab option is 
-not checked, the grant tab will not appear on the node page regardless of user permissions.
+Bugs and feature requests should be reported in [the Issue Queue](https://github.com/backdrop-contrib/nodeaccess/issues).
 
-For each node type, you can also choose the default permissions for that type. To emulate 
-standard Backdrop permissions, you would give anonymous user and authenticated user view permissions
-for each node type. Note that once this module is first enabled, no permissions are granted, so
-it is important to set defaults.
+Current Maintainers
+-------------------
 
-The default permissions for each node type will apply to any node which does not have
-permissions set, either at the time you submit the settings or when any new node is
-created. For already existing nodes, the defaults will apply only to those nodes which
-have not had custom permissions set on the node grants tab. 
+- [Michael R. Bagnall](https://github.com/ElusiveMind).
 
-TIPS:
+Credits
+-------
 
-If you grant authenticated users edit permission, you cannot revoke that for any user
-who is a member of authenticated users. For example, if you wanted all users to be able
-to edit a node except for one user, you cannot do this by granting edit permission to 
-authenticated users, then adding the user to the node without view permissions. Backdrop
-doesn't let you do that.
+- Ported to Backdrop CMS by [Michael R. Bagnall](https://github.com/ElusiveMind).
+- Originally written for Drupal by Chad Cunningham.
+
+License
+-------
+
+This project is GPL v2 software.
+See the LICENSE.txt file in this directory for complete text.
