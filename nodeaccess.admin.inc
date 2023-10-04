@@ -102,7 +102,9 @@ function nodeaccess_admin_form($form, $form_state) {
       grants tab, make sure they are not selected here.'),
   );
 
+  $user_roles = user_roles();
   foreach ($roles as $id => $role) {
+    $role_name = $user_roles[$role->name];
     if (!$role->weight) {
       $role->weight = 0;
     }
@@ -112,7 +114,7 @@ function nodeaccess_admin_form($form, $form_state) {
     );
     $form['role'][$id]['allow'] = array(
       '#type' => 'checkbox',
-      '#title' => check_plain($role->name),
+      '#title' => check_plain($role_name),
       '#default_value' => isset($allowed_roles[$id]) ? $allowed_roles[$id] : 0,
     );
   }
@@ -157,6 +159,11 @@ function nodeaccess_admin_form($form, $form_state) {
 
     // Set default author permissions for node type.
     $author_prefs = $config->get('authors');
+    if (empty($author_prefs[$type])) {
+      $author_prefs[$type]['grant_view'] = 0;
+      $author_prefs[$type]['grant_update'] = 0;
+      $author_prefs[$type]['grant_delete'] = 0;
+    }
     $form['nodeaccess'][$type]['author']['grant_view'] = array(
       '#type' => 'checkbox',
       '#default_value' => $author_prefs[$type]['grant_view'],

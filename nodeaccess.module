@@ -1123,6 +1123,30 @@ function nodeaccess_get_role_id_from_machine($machine) {
 }
 
 /**
+ * Get the machine name from our role id used by backdrop and 
+ * mapped when we install our module or add a new role.
+ * 
+ * @param int $role_id
+ *   The id associated with the role.
+ *   The machine name for which we need to procure the nodeaccess
+ *   role id.
+ * 
+ * @return string $machine
+ *   The machine name for which we need to procure the nodeaccess
+ *   role id. Returns FALSE if none exist.
+ */
+function nodeaccess_get_machine_from_role_id($role_id) {
+  $config = config('nodeaccess.settings');
+  $map = $config->get('role_map');
+  if (!empty($map[$role_id])) {
+    return $map[$role_id]['name'];
+  }
+  else {
+    return FALSE;
+  }
+}
+
+/**
  * Get the default grants for the specified node type and return it in
  * an assignable way
  * 

@@ -147,50 +147,71 @@ function nodeaccess_install() {
   $config->set('allowed_grants', $grant_prefs);
 
   $config->save();
+}
 
-  // Check to see if we are doing a migration.
-  nodeaccess_update_7106();
+/**
+ * Implements hook_update_last_removed().
+ */
+function nodeaccess_update_last_removed() {
+  return 7105;
 }
 
 /**
  * Convert our Nodeaccess Drupal 7 configurations to Backdrop
  */
-function nodeaccess_update_7106() {
+function nodeaccess_update_1000() {
   /**
-   * Only do this if nodeaccess_help exists. That is a function in the Drupal
-   * 7 version that is not in the Backdrop version. Tells us if we're doing a
-   * migration or not.
-   * 
    * If we are doing a full on D7 -> Backdrop migration the nodeaccess and
    * node_access tables should be the same and already map. The only problem
    * are the grant ids due to differences between D7 and Backdrop in terms of
    * role identifiers. So we will need to rebuild our access tables once we're
    * done.
    */
-  if (function_exists('nodeaccess_help')) {
-    $config = config('nodeaccess.settings');
-    $config->set('priority', variable_get('nodeaccess-priority', 0));
-    $config->set('preserve', variable_get('nodeaccess-preserve', 0));
-    $config->set('allowed_grants', variable_get('nodeaccess-grants', array()));
-    $config->set('allowed_types', variable_get('nodeaccess-types', array()));
-    $config->set('authors', variable_get('nodeaccess_authors', array()));
-    variable_del('nodeaccess-priority');
-    variable_del('nodeaccess-preserve');
-    variable_del('nodeaccess-grants');
-    variable_del('nodeaccess-roles');
-    variable_del('nodeaccess-types');
-    variable_del('nodeaccess_authors');
+  $config = config('nodeaccess.settings');
+  $config->set('priority', variable_get('nodeaccess-priority', 0));
+  $config->set('preserve', variable_get('nodeaccess-preserve', 0));
+  $config->set('allowed_grants', variable_get('nodeaccess-grants', array()));
+  $config->set('types', variable_get('nodeaccess-types', array()));
+  $config->set('authors', variable_get('nodeaccess_authors', array()));
+  variable_del('nodeaccess-priority');
+  variable_del('nodeaccess-preserve');
+  variable_del('nodeaccess-grants');
+  variable_del('nodeaccess-roles');
+  variable_del('nodeaccess-types');
+  variable_del('nodeaccess_authors');
 
-    foreach (node_type_get_types() as $type => $name) {
-      $nprefs = variable_get('nodeaccess_' . $type, array());
-      $uprefs = variable_get('nodeaccess_' . $type . '_userreference', array());
+  foreach (node_type_get_types() as $type => $name) {
+    $nprefs = variable_get('nodeaccess_' . $type, array());
+    $uprefs = variable_get('nodeaccess_' . $type . '_userreference', array());
+    if (!empty($nprefs)) {
+      foreach ($nprefs as $role_id => $pref) {
+        $machine = nodeaccess_get_machine_from_role_id($role_id);
+        $nprefs[$machine] = $pref;
+        unset($nprefs[$role_id]);
+      }
       $config->set('nodeaccess_' . $type, $nprefs);
-      $config->set('nodeaccess_' . $type . '_userreference', array());
+      $config->set('nodeaccess_' . $type . '_userreference', $uprefs);
       variable_del('nodeaccess_' . $type);
       variable_del('nodeaccess_' . $type . '_userreference');
     }
-
-    $config->save();
-    node_access_needs_rebuild(TRUE);
+    else {
+      $roles = user_roles();
+      $grants = array();
+      foreach ($roles as $role => $role_name) {
+        $gid = nodeaccess_get_role_id_from_machine($role);
+        $grants[$role] = array(
+          'gid' => $gid,
+          'realm' => 'nodeaccess_rid',
+          'grant_view' => 0,
+          'grant_update' => 0,
+          'grant_delete' => 0,
+        );
+      }
+      $config->set('nodeaccess_' . $type, $grants);
+      $config->set('nodeaccess_' . $type . '_userreference', array());
+    }
   }
+  $config->save();
+  node_access_needs_rebuild(TRUE);
+
 }
