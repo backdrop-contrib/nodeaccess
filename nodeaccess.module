@@ -774,7 +774,7 @@ function nodeaccess_node_type_update($info) {
       'grant_delete' => $author_prefs[$info->old_type]['grant_delete'],
     );
     unset($author_prefs[$info->old_type]);
-    $config->set('nodeaccess_authors', $author_prefs);
+    $config->set('authors', $author_prefs);
     $config->save();
   }
 }
