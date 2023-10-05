@@ -1061,6 +1061,8 @@ function nodeaccess_save_grant($node, $grant) {
  *   The node type we are adding the grant tab for.
  */
 function nodeaccess_add_type_grant($type) {
+  // Load in our configurations
+  $config = config('nodeaccess.settings');
   $grants = $config->get('nodeaccess-types', array());
   $grants[$type] = TRUE;
   nodeaccess_set_type_grants($grants);
