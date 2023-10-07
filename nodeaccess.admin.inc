@@ -75,17 +75,17 @@ function nodeaccess_admin_form($form, $form_state) {
   $form['grant']['view'] = array(
     '#type' => 'checkbox',
     '#title' => t('View'),
-    '#default_value' => $allowed_grants['view'],
+    '#default_value' => (!empty($allowed_grants['view'])) ? 0 : 1,
   );
   $form['grant']['edit'] = array(
     '#type' => 'checkbox',
     '#title' => t('Edit'),
-    '#default_value' => $allowed_grants['edit'],
+    '#default_value' => (!empty($allowed_grants['edit'])) ? 0 : 1,
   );
   $form['grant']['delete'] = array(
     '#type' => 'checkbox',
     '#title' => t('Delete'),
-    '#default_value' => $allowed_grants['delete'],
+    '#default_value' => (!empty($allowed_grants['delete'])) ? 0 : 1,
   );
 
   // Select roles the permissions of which you want to allow users to

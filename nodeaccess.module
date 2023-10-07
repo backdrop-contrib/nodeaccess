@@ -700,7 +700,16 @@ function nodeaccess_node_access_records($node) {
   $author_prefs = $config->get('authors');
 
   // Array is pre-populated with grant values.
-  $grant = $author_prefs[$node->type];
+  if (!empty($author_prefs[$node->type])) {
+    $grant = $author_prefs[$node->type];
+  }
+  else {
+    $grant = array(
+      'grant_view' => 0,
+      'grant_update' => 0,
+      'grant_delete' => 0,
+    );
+  }
   $grant['gid'] = $node->uid;
   $grant['realm'] = 'nodeaccess_author';
   // Include author grant even with all values FALSE, it may be
